@@ -25,3 +25,4 @@ ops/
 
 # docker target folder
 docker/target
+sandbox-export.json
