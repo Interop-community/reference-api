@@ -1,11 +1,3 @@
--- determine the size (MB)
-
-SELECT sub.table_schema, sub.table_schema_size_mb, SUBSTRING(sub.table_schema, 6 + POSITION('_' IN SUBSTRING(sub.table_schema, 6))) AS "sandbox_name"
-FROM (
-  SELECT table_schema AS "table_schema",
-  (SUM(data_length + index_length) / 1024 / 1024) AS "table_schema_size_mb"
-  FROM information_schema.TABLES
-  WHERE UPPER(table_schema) like 'HSPC_%'
-  GROUP BY table_schema
-) AS sub
-ORDER BY sub.table_schema_size_mb;
+version https://git-lfs.github.com/spec/v1
+oid sha256:8a2dad7d6045f2e2247f67234b5db3646225e359c8319508a3e5b584b84445a7
+size 1155
