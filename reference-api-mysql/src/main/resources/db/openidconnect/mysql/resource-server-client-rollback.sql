@@ -1,12 +1,3 @@
-SET AUTOCOMMIT = 0;
-
-START TRANSACTION;
-
--- HSPC Resource Server
-DELETE FROM client_grant_type WHERE owner_id = (SELECT id from client_details where client_id = 'hspc_resource_server');
-DELETE FROM client_scope WHERE owner_id = (SELECT id from client_details where client_id = 'hspc_resource_server');
-DELETE FROM client_details WHERE client_id = 'hspc_resource_server';
-
-COMMIT;
-
-SET AUTOCOMMIT = 1;
+version https://git-lfs.github.com/spec/v1
+oid sha256:fa8e0f841925c24b83009cb9761fa58074b9e73e59290403b328034867f2f5b6
+size 1111
