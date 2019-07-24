@@ -49,8 +49,10 @@ public class ScopeBasedAuthorizationInterceptor extends InterceptorAdapter {
     public boolean incomingRequestPostProcessed(RequestDetails theRequestDetails, HttpServletRequest theRequest, HttpServletResponse theResponse) throws AuthenticationException {
 
         // Authorization filtering only applies to searching a particular type
-        if (theRequestDetails.getRestOperationType() != RestOperationTypeEnum.SEARCH_TYPE)
+        if (theRequestDetails.getRestOperationType() != RestOperationTypeEnum.SEARCH_TYPE) {
             return true;
+        }
+
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
@@ -71,17 +73,76 @@ public class ScopeBasedAuthorizationInterceptor extends InterceptorAdapter {
                 return true;
         }
 
-        // finally, apply filtering for patient scoped queries
+//        String scope_patientId;
+//        String patientId = "";
         for (SmartScope smartScope : smartScopes) {
             if (smartScope.isPatientScope()) {
                 String patientId = hspcOAuth2Authentication.getLaunchContextParams().get(LAUNCH_CONTEXT_PATIENT_PARAM_NAME);
                 filterToPatientScope(patientId, theRequestDetails);
+//
+//                String uri = theRequest.getRequestURI();
+//                String queryString = theRequest.getQueryString();
+//
+//                if (uri.contains("Patient/")) {
+//                    patientId = uri.substring(uri.indexOf("Patient") + 8);
+//                } else if (uri.contains("Patient") && queryString != null && queryString.contains("_id=")) {
+//                    patientId = queryString.substring(queryString.indexOf("_id=") + 4);
+//                } else if (queryString != null && queryString.contains("patient") && !queryString.contains("&_count")) {
+//                    patientId = queryString.substring(queryString.indexOf("patient") + 8);
+//                } else if (queryString != null && queryString.contains("patient") && queryString.contains("&_count")) {
+//                    patientId = queryString.substring(queryString.indexOf("patient") + 8, queryString.indexOf("&_count"));
+//                }
+//
+//                if (!patientId.isEmpty()) {
+//                    if (!scope_patientId.equals(patientId)) {
+//                        throw new SecurityException("Patient: " + patientId + " is not in the selected patient scope.");
+//                    }
+//                }
+
                 return true;
             }
+
         }
 
         return true;
     }
+
+//    @Override
+//    public boolean incomingRequestPreProcessed(HttpServletRequest theRequest, HttpServletResponse theResponse) {
+//
+//        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+//
+//        HspcOAuth2Authentication hspcOAuth2Authentication = (HspcOAuth2Authentication) authentication;
+//
+//        Set<SmartScope> smartScopes = getSmartScopes(hspcOAuth2Authentication);
+//
+//        for (SmartScope smartScope : smartScopes) {
+//            if (smartScope.isPatientScope()) {
+//                String scope_patientId = hspcOAuth2Authentication.getLaunchContextParams().get(LAUNCH_CONTEXT_PATIENT_PARAM_NAME);
+//                String uri = theRequest.getRequestURI();
+//                String queryString = theRequest.getQueryString();
+//                String patientId = "";
+//                if (uri.contains("Patient/")) {
+//                    patientId = uri.substring(uri.indexOf("Patient") + 8);
+//                } else if (uri.contains("Patient") && queryString.contains("_id=")) {
+//                    patientId = queryString.substring(queryString.indexOf("_id=") + 4);
+//                } else if (queryString != null && queryString.contains("patient") && !queryString.contains("&_count")) {
+//                    patientId = queryString.substring(queryString.indexOf("patient") + 8);
+//                } else if (queryString != null && queryString.contains("patient") && queryString.contains("&_count")) {
+//                    patientId = queryString.substring(queryString.indexOf("patient") + 8, queryString.indexOf("&_count"));
+//                }
+//
+//                if (!patientId.isEmpty()) {
+//                    if (!scope_patientId.equals(patientId)) {
+//                        throw new SecurityException("Patient: " + patientId + " is not in the selected patient scope.");
+//                    }
+//                }
+//                return true;
+//            }
+//        }
+//
+//        return true;
+//    }
 
 
     private void filterToPatientScope(String patientId, RequestDetails requestDetails) {
@@ -109,10 +170,6 @@ public class ScopeBasedAuthorizationInterceptor extends InterceptorAdapter {
             requestDetails.addParameter(scopeParam, addValueToStringArray(existingScopeParamValue, patientId));
         }
     }
-
-
-    ////
-    // private methods
 
     private String[] addValueToStringArray(String[] stringArray, String newValue) {
         String[] newArray = new String[stringArray.length + 1];
@@ -148,4 +205,5 @@ public class ScopeBasedAuthorizationInterceptor extends InterceptorAdapter {
 
         return scopes;
     }
+
 }
