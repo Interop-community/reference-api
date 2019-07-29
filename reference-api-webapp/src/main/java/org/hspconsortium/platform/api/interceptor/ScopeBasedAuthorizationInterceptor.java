@@ -22,8 +22,10 @@ package org.hspconsortium.platform.api.interceptor;
 
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
+import ca.uhn.fhir.rest.api.server.ResponseDetails;
 import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.interceptor.InterceptorAdapter;
+import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hspconsortium.platform.api.authorization.ScopeBasedAuthorizationParams;
 import org.hspconsortium.platform.api.authorization.SmartScope;
 import org.hspconsortium.platform.api.oauth2.HspcOAuth2Authentication;
@@ -31,10 +33,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.*;
+import java.lang.reflect.*;
+
+import static ch.qos.logback.core.joran.util.beans.BeanUtil.isGetter;
 
 
 @Component
@@ -50,9 +54,9 @@ public class ScopeBasedAuthorizationInterceptor extends InterceptorAdapter {
 
         // Authorization filtering only applies to searching a particular type
         if (theRequestDetails.getRestOperationType() != RestOperationTypeEnum.SEARCH_TYPE) {
+            if (theRequestDetails.getRestOperationType() != RestOperationTypeEnum.VREAD)
             return true;
         }
-
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
@@ -73,31 +77,31 @@ public class ScopeBasedAuthorizationInterceptor extends InterceptorAdapter {
                 return true;
         }
 
-//        String scope_patientId;
-//        String patientId = "";
+        String scope_patientId;
+        String patientId = "";
         for (SmartScope smartScope : smartScopes) {
             if (smartScope.isPatientScope()) {
-                String patientId = hspcOAuth2Authentication.getLaunchContextParams().get(LAUNCH_CONTEXT_PATIENT_PARAM_NAME);
-                filterToPatientScope(patientId, theRequestDetails);
-//
-//                String uri = theRequest.getRequestURI();
-//                String queryString = theRequest.getQueryString();
-//
-//                if (uri.contains("Patient/")) {
-//                    patientId = uri.substring(uri.indexOf("Patient") + 8);
-//                } else if (uri.contains("Patient") && queryString != null && queryString.contains("_id=")) {
-//                    patientId = queryString.substring(queryString.indexOf("_id=") + 4);
-//                } else if (queryString != null && queryString.contains("patient") && !queryString.contains("&_count")) {
-//                    patientId = queryString.substring(queryString.indexOf("patient") + 8);
-//                } else if (queryString != null && queryString.contains("patient") && queryString.contains("&_count")) {
-//                    patientId = queryString.substring(queryString.indexOf("patient") + 8, queryString.indexOf("&_count"));
-//                }
-//
-//                if (!patientId.isEmpty()) {
-//                    if (!scope_patientId.equals(patientId)) {
-//                        throw new SecurityException("Patient: " + patientId + " is not in the selected patient scope.");
-//                    }
-//                }
+                scope_patientId = hspcOAuth2Authentication.getLaunchContextParams().get(LAUNCH_CONTEXT_PATIENT_PARAM_NAME);
+                filterToPatientScope(scope_patientId, theRequestDetails);
+
+                String uri = theRequest.getRequestURI();
+                String queryString = theRequest.getQueryString();
+
+                if (uri.contains("Patient/")) {
+                    patientId = uri.substring(uri.indexOf("Patient") + 8);
+                } else if (uri.contains("Patient") && queryString != null && queryString.contains("_id=")) {
+                    patientId = queryString.substring(queryString.indexOf("_id=") + 4);
+                } else if (queryString != null && queryString.contains("patient") && !queryString.contains("&_count")) {
+                    patientId = queryString.substring(queryString.indexOf("patient") + 8);
+                } else if (queryString != null && queryString.contains("patient") && queryString.contains("&_count")) {
+                    patientId = queryString.substring(queryString.indexOf("patient") + 8, queryString.indexOf("&_count"));
+                }
+
+                if (!patientId.isEmpty()) {
+                    if (!scope_patientId.equals(patientId)) {
+                        return false;
+                    }
+                }
 
                 return true;
             }
@@ -106,6 +110,26 @@ public class ScopeBasedAuthorizationInterceptor extends InterceptorAdapter {
 
         return true;
     }
+
+    @Override
+    public boolean outgoingResponse(RequestDetails theRequestDetails, ResponseDetails theResponseDetails, HttpServletRequest theServletRequest, HttpServletResponse theServletResponse) throws AuthenticationException {
+
+//        IBaseResource resource = theResponseDetails.getResponseResource();
+//        String[] resourceList = {"Encounter", "MedicationRequest", "MedicationOrder"};
+//        try {
+//            if (Arrays.stream(resourceList).anyMatch(resource.getIdElement().getResourceType()::equals)) {
+//             resource.getClass().getMethod("getSubject");
+//            }
+//        } catch (Exception e) {
+//
+//        }
+
+        return true;
+    }
+
+
+
+
 
 //    @Override
 //    public boolean incomingRequestPreProcessed(HttpServletRequest theRequest, HttpServletResponse theResponse) {
