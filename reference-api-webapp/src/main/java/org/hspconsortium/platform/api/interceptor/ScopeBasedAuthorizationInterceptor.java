@@ -25,10 +25,15 @@ import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.api.server.ResponseDetails;
 import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.interceptor.InterceptorAdapter;
+import org.hl7.fhir.instance.model.Encounter;
+import org.hl7.fhir.instance.model.Reference;
+import org.hl7.fhir.instance.model.StringType;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hspconsortium.platform.api.authorization.ScopeBasedAuthorizationParams;
 import org.hspconsortium.platform.api.authorization.SmartScope;
 import org.hspconsortium.platform.api.oauth2.HspcOAuth2Authentication;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -114,15 +119,64 @@ public class ScopeBasedAuthorizationInterceptor extends InterceptorAdapter {
     @Override
     public boolean outgoingResponse(RequestDetails theRequestDetails, ResponseDetails theResponseDetails, HttpServletRequest theServletRequest, HttpServletResponse theServletResponse) throws AuthenticationException {
 
-//        IBaseResource resource = theResponseDetails.getResponseResource();
-//        String[] resourceList = {"Encounter", "MedicationRequest", "MedicationOrder"};
-//        try {
-//            if (Arrays.stream(resourceList).anyMatch(resource.getIdElement().getResourceType()::equals)) {
-//             resource.getClass().getMethod("getSubject");
-//            }
-//        } catch (Exception e) {
+        IBaseResource resource = theResponseDetails.getResponseResource();
+        String[] resourceList = {"Encounter", "MedicationRequest", "MedicationOrder"};
+        String patientId = "";
+        String patientId2 = "";
+        try {
+            if (Arrays.stream(resourceList).anyMatch(resource.getIdElement().getResourceType()::equals)) {
+//                patientId = ((Reference)((Encounter) theResponseDetails.getResponseResource()).getPatient()).getReference();
+
+                Method[] resourceMethods = resource.getClass().getMethods();
+                for (Method method: resourceMethods) {
+                    if (method.getName().equalsIgnoreCase("getSubject")) {
+                        Class referenceClass = resource.getClass().getMethod("getSubject").getReturnType();
+                        Object newObj = Class.forName(referenceClass.getName()).cast(resource.getClass().getMethod("getSubject").invoke(resource));
+
+                        Method m  = newObj.getClass().getDeclaredMethod("getReference");
+                        m.setAccessible(true);
+                        Object o = m.invoke(referenceClass.newInstance());
+                        System.out.println((String) o);
+
+                        patientId2 = "a";
+
+//                        Method[] referenceMethods = referenceClass.getDeclaredMethods();
+//                        for (Method method2: referenceMethods) {
+//                            if (method2.getName().equalsIgnoreCase("getReference")) {
+//                                Method m = referenceClass.getMethod("getReference");
+//                                m.setAccessible(true);
+//                                Object o = m.invoke(referenceClass.newInstance());
+//                                System.out.println((String) o);
+//                                patientId2 = "";
 //
-//        }
+//                            }
+//                        }
+
+
+//                        Field[] fields1 = referenceClass.getDeclaredFields();
+//                        for (Field field: fields1) {
+//                            if (field.getName().equalsIgnoreCase("reference")) {
+//                                field.setAccessible(true);
+////                                field.get(new StringType());
+//                                System.out.println(field.get(referenceClass.newInstance()));
+//                            }
+//                        }
+//                        Field f = fields1.getClass().getDeclaredField("reference");
+//
+//                        System.out.println(f.get(returnedClass));
+//                        Field field = returnedClass.getField("reference");
+//                        Object fieldValue = field.get("reference");
+//                        patientId2 = resource.getClass().getField("SP_SUBJECT").toString();
+
+                    }
+
+                }
+//                resource.getClass().getMethod("getSubject");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+
+        }
 
         return true;
     }
