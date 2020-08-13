@@ -23,6 +23,7 @@ package org.hspconsortium.platform.api;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.FhirVersionEnum;
+import ca.uhn.fhir.jpa.bulk.BulkDataExportProvider;
 import ca.uhn.fhir.jpa.dao.DaoConfig;
 import ca.uhn.fhir.jpa.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.dao.IFhirResourceDao;
@@ -229,6 +230,9 @@ public class FhirRestServlet extends RestfulServer {
         if (fhirVersion == FhirVersionEnum.DSTU3) {
             registerProvider(myAppCtx.getBean(ca.uhn.fhir.jpa.provider.TerminologyUploaderProvider.class));
         }
+
+        registerProvider(myAppCtx.getBean(BulkDataExportProvider.class));
+
     }
 
     /**
