@@ -56,7 +56,7 @@ public class TenantManagementService {
 
     public boolean deleteTenant(String tenantName) {
         // remove cached connection
-        dataSourceRepository.deleteDataSourceIfExists(tenantName);
+        dataSourceRepository.deleteTenantIfExists(tenantName);
 
         // remove schema in database
         Connection connection = null;

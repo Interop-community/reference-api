@@ -41,18 +41,18 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 @Component
 public class DataSourceRepository {
 
+    private static final String CONNECTION_POOL_NAME = "HikariCP";
+
     private Log log = LogFactory.getLog(DataSourceRepository.class);
-
-    private ConcurrentMap<String, DataSourceCacheWrapper> datasourceCache;
-
-    @Value("${hspc.platform.api.fhir.datasource.cache.size:5}")
-    private int dataSourceCacheSize;
 
     @Value("${hspc.platform.api.fhir.datasource.url}")
     private String jdbcUrl;
@@ -65,9 +65,6 @@ public class DataSourceRepository {
 
     @Value("${hspc.platform.api.fhir.datasource.defaultTenant}")
     private String defaultTenant;
-
-    @Value("${hspc.platform.api.fhir.datasource.schemaPrefix}")
-    private String schemaPrefix;
 
     @Value("${hspc.platform.api.fhir.datasource.minimumIdle}")
     private Integer minimumIdle;
@@ -92,75 +89,71 @@ public class DataSourceRepository {
 
     private DataSource defaultDataSource;
 
-    public DataSourceRepository() {
-        datasourceCache = new ConcurrentHashMap<>(dataSourceCacheSize);
-    }
+    private DataSource tenantsDataSource;
 
-    public DataSourceRepository(ConcurrentMap<String, DataSourceCacheWrapper> datasourceCache) {
-        this.datasourceCache = datasourceCache;
-    }
+    private List<String> tenants = Collections.synchronizedList(new ArrayList<>());
 
     public DataSource getDefaultDataSource() {
         if (defaultDataSource == null) {
-            HikariConfig config = new HikariConfig();
-            config.setJdbcUrl(jdbcUrl);
-            config.setUsername(dbUsername);
-            config.setPassword(dbPassword);
-            config.setMinimumIdle(minimumIdle);
-            config.setMaximumPoolSize(maximumPoolSize);
-            config.setIdleTimeout(idleTimeout);
-            config.setConnectionTimeout(connectionTimeout);
-            config.setLeakDetectionThreshold(leakDetectionThreshold);
-
-            defaultDataSource = new HikariDataSource(config);
+            defaultDataSource = new HikariDataSource(getHikariConfig());
         }
-
         return defaultDataSource;
     }
 
-    public DataSource getDataSource(String tenantIdentifier) {
-
-        if (datasourceCache.containsKey(tenantIdentifier)) {
-            DataSourceCacheWrapper dsWrapper = datasourceCache.get(tenantIdentifier);
-            dsWrapper.setLastUsedDate(LocalDateTime.now());
-            return dsWrapper.getDataSource();
-        }
-
-        if (datasourceCache.size() >= dataSourceCacheSize) {
-            removeLastUsedFromCache();
-        }
-
-        DataSource ds = createDataSource(tenantIdentifier);
-        datasourceCache.put(tenantIdentifier, new DataSourceCacheWrapper(ds, LocalDateTime.now()));
-        log.warn("datasourceCache size: " + datasourceCache.size());
-        return ds;
+    private HikariConfig getHikariConfig() {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(jdbcUrl);
+        config.setUsername(dbUsername);
+        config.setPassword(dbPassword);
+        config.setMinimumIdle(minimumIdle);
+        config.setMaximumPoolSize(maximumPoolSize);
+        config.setIdleTimeout(idleTimeout);
+        config.setConnectionTimeout(connectionTimeout);
+        config.setLeakDetectionThreshold(leakDetectionThreshold);
+        config.setPoolName(CONNECTION_POOL_NAME);
+        return config;
     }
 
-    public void deleteDataSourceIfExists(String tenantIdentifier) {
-        if (datasourceCache.containsKey(tenantIdentifier)) {
-            DataSourceCacheWrapper dsWrapper = datasourceCache.get(tenantIdentifier);
-            try {
-                dsWrapper.getDataSource().getConnection().close();
-            } catch (SQLException e) {
-                log.info("Could not close connection when deleting tenant " + tenantIdentifier);
+    public DataSource getDataSource(String tenant) {
+        synchronized (tenants) {
+            if (!tenants.contains(tenant)) {
+                tenants.add(tenant);
             }
-            datasourceCache.remove(tenantIdentifier);
+        }
+        return getDataSource();
+    }
+
+    public void deleteTenantIfExists(String tenant) {
+        synchronized (tenants) {
+            if (tenants.contains(tenant)) {
+                tenants.remove(tenant);
+            }
         }
     }
 
-    private DataSource createDataSource(String tenant) throws HikariPool.PoolInitializationException {
+    private DataSource getDataSource() {
+
+        if (tenantsDataSource == null) {
+            tenantsDataSource = createTenantsDataSource();
+        }
+
+        log.debug("Returning datasource");
+        return tenantsDataSource;
+    }
+
+    private DataSource createTenantsDataSource() throws HikariPool.PoolInitializationException {
         HikariDataSource ds;
 
-        ds = new HikariDataSource(hikariConfig(tenant));
+        ds = new HikariDataSource(hikariConfig());
 
         Connection conn = null;
         try {
             //verify for a valid datasource
             conn = ds.getConnection();
             conn.isValid(2);
-            log.warn("Creating datasource: " + tenant);
+            log.warn("Creating datasource for tenants");
         } catch (SQLException e) {
-            log.error(String.format("Connection couldn't be established for tenant '%s'.", tenant));
+            log.error("Connection couldn't be established for tenants datasource'.");
             ds = null;
         } finally {
             // Always make sure result sets and statements are closed, and the connection is returned to the pool
@@ -175,39 +168,9 @@ public class DataSourceRepository {
         return ds;
     }
 
-    private HikariConfig hikariConfig(String tenant) {
-        HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(jdbcUrl + "/" + schemaPrefix + tenant);
-        config.setUsername(dbUsername);
-        config.setPassword(dbPassword);
-        config.setMinimumIdle(minimumIdle);
-        config.setMaximumPoolSize(maximumPoolSize);
-        config.setIdleTimeout(idleTimeout);
-        config.setConnectionTimeout(connectionTimeout);
-        config.setLeakDetectionThreshold(leakDetectionThreshold);
-
+    private HikariConfig hikariConfig() {
         loadIndexFiles();
-
-        return config;
-    }
-
-    private void removeLastUsedFromCache() {
-        LocalDateTime oldestDate = null;
-        String oldestTenant = null;
-        for (String key : datasourceCache.keySet()) {
-            LocalDateTime date = datasourceCache.get(key).getLastUsedDate();
-            if (oldestDate == null || date.isBefore(oldestDate)) {
-                oldestDate = date;
-                oldestTenant = key;
-            }
-        }
-        log.warn("Evicting datasource: " + oldestTenant);
-
-        //drop all connections before removing datasource
-        HikariDataSource oldestDataSource = (HikariDataSource) datasourceCache.get(oldestTenant).getDataSource();
-        oldestDataSource.close();
-
-        datasourceCache.remove(oldestTenant);
+        return getHikariConfig();
     }
 
     private void loadIndexFiles() {
@@ -237,7 +200,7 @@ public class DataSourceRepository {
                     OutputStream out = Files.newOutputStream(Paths.get(tarFile));
                     GzipCompressorInputStream gzIn = new GzipCompressorInputStream(in);
                     final byte[] buffer = new byte[1024];
-                    int n = 0;
+                    int n;
                     while (-1 != (n = gzIn.read(buffer))) {
                         out.write(buffer, 0, n);
                     }
@@ -256,98 +219,5 @@ public class DataSourceRepository {
             }
         }
     }
-
-//    public HashMap<String, Double> memoryAllSandboxes(List<String> activeSandboxIds) {
-//        HashMap<String, Double> sandboxMemorySizes = new HashMap<>();
-//
-//        final DataSourceProperties dataSourceProperties = this.multitenancyProperties.getInformationSchemaProperties();
-//        DataSourceBuilder factory = DataSourceBuilder
-//                .create(this.multitenancyProperties.getDataSource().getClassLoader())
-////                .driverClassName(this.multitenancyProperties.getDataSource().getDriverClassName())
-//                .username(dataSourceProperties.getUsername())
-//                .password(dataSourceProperties.getPassword())
-//                .url(dataSourceProperties.getUrl());
-//
-//        DataSource dataSource = factory.build();
-//        Connection conn = null;
-//        try {
-//            //verify for a valid datasource
-//            if (dataSource instanceof org.apache.tomcat.jdbc.pool.DataSource) {
-//                ((org.apache.tomcat.jdbc.pool.DataSource) dataSource).getPoolProperties().setMaxActive(5);
-//            }
-//            conn = dataSource.getConnection();
-//            conn.isValid(2);
-//            Statement stmt = conn.createStatement();
-//            String query = "select table_schema, sum((data_length+index_length)/1024/1024) AS MB from information_schema.tables group by 1;";
-//            ResultSet rs = stmt.executeQuery(query);
-//            while (rs.next()) {
-//                if (activeSandboxIds.contains(rs.getString(1))) {
-//                    sandboxMemorySizes.put(rs.getString(1), Double.parseDouble(rs.getString(2)));
-//                }
-//
-//            }
-//            return sandboxMemorySizes;
-//        } catch (SQLException e) {
-//
-//        } finally {
-//            // Always make sure result sets and statements are closed, and the connection is returned to the pool
-//            if (conn != null) {
-//                try {
-//                    conn.close();
-//
-//                } catch (SQLException e) {
-//                    LOGGER.error("Error closing connection pool", e);
-//                }
-//            }
-//        }
-//        return null;
-//    }
-//
-//    public HashMap<String, Double> memoryAllSandboxesOfUser(List<String> sandboxIds) {
-//        HashMap<String, Double> sandboxMemorySizes = new HashMap<>();
-//
-//        final DataSourceProperties dataSourceProperties = this.multitenancyProperties.getInformationSchemaProperties();
-//        DataSourceBuilder factory = DataSourceBuilder
-//                .create(this.multitenancyProperties.getDataSource().getClassLoader())
-////                .driverClassName(this.multitenancyProperties.getDataSource().getDriverClassName())
-//                .username(dataSourceProperties.getUsername())
-//                .password(dataSourceProperties.getPassword())
-//                .url(dataSourceProperties.getUrl());
-//
-//        DataSource dataSource = factory.build();
-//        Connection conn = null;
-//        try {
-//            //verify for a valid datasource
-//            if (dataSource instanceof org.apache.tomcat.jdbc.pool.DataSource) {
-//                ((org.apache.tomcat.jdbc.pool.DataSource) dataSource).getPoolProperties().setMaxActive(5);
-//            }
-//            conn = dataSource.getConnection();
-//            conn.isValid(2);
-//            Statement stmt = conn.createStatement();
-//            for (String id : sandboxIds) {
-//                String query = "select table_schema, sum((data_length+index_length)/1024/1024) AS MB from information_schema.tables " +
-//                        "WHERE table_schema REGEXP 'hspc_[0-9]_" + id + "' group by 1;";
-//                ResultSet rs = stmt.executeQuery(query);
-//                while (rs.next()) {
-//                    sandboxMemorySizes.put(rs.getString(1), Double.parseDouble(rs.getString(2)));
-//                }
-//            }
-//
-//            return sandboxMemorySizes;
-//        } catch (SQLException e) {
-//
-//        } finally {
-//            // Always make sure result sets and statements are closed, and the connection is returned to the pool
-//            if (conn != null) {
-//                try {
-//                    conn.close();
-//
-//                } catch (SQLException e) {
-//                    LOGGER.error("Error closing connection pool", e);
-//                }
-//            }
-//        }
-//        return null;
-//    }
 
 }
