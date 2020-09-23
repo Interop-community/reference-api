@@ -35,9 +35,7 @@ public class DatabaseConnections {
         apiCallResults.forEach(result -> {
             try {
                 assertEquals(HTTP_OK , result.get());
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
+            } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }
         });
@@ -48,9 +46,7 @@ public class DatabaseConnections {
         List<Callable<String>> apiCalls = new ArrayList<>(SANDBOX_COUNT * FHIR_RESOURCE_COUNT);
         IntStream.range(0, SANDBOX_COUNT)
                  .forEach(sandboxIndex -> IntStream.range(0, FHIR_RESOURCE_COUNT)
-                                                   .forEach(fhirResourceIndex -> {
-                                                       apiCalls.add(apiCallTask(sandboxIndex, fhirResourceIndex));
-                                                   }));
+                                                   .forEach(fhirResourceIndex -> apiCalls.add(apiCallTask(sandboxIndex, fhirResourceIndex))));
         return apiCalls;
     }
 
