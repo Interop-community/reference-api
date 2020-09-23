@@ -40,12 +40,9 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 @Component
 public class DataSourceRepository {
@@ -62,9 +59,6 @@ public class DataSourceRepository {
 
     @Value("${hspc.platform.api.fhir.datasource.password}")
     private String dbPassword;
-
-    @Value("${hspc.platform.api.fhir.datasource.defaultTenant}")
-    private String defaultTenant;
 
     @Value("${hspc.platform.api.fhir.datasource.minimumIdle}")
     private Integer minimumIdle;
