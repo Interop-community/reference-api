@@ -107,7 +107,7 @@ public class ConformanceMethodBinding extends BaseResourceReturningMethodBinding
 
         var cacheControlHeaders = theRequest.getHeaders(Constants.HEADER_CACHE_CONTROL);
         cacheControlHeaders.add("no-cache");
-        CacheControlDirective cacheControlDirective = new CacheControlDirective().parse(theRequest.getHeaders(Constants.HEADER_CACHE_CONTROL));
+        CacheControlDirective cacheControlDirective = new CacheControlDirective().parse(cacheControlHeaders);
 
         if (cacheControlDirective.isNoCache())
             conf = null;
