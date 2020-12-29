@@ -170,6 +170,19 @@ server:
 
 ---
 
+spring:
+  profiles: r5
+
+hspc:
+  platform:
+    api:
+      sandbox:
+        name: ${SANDBOX_NAME:hspc11}
+server:
+  port: ${API_PORT:8071}
+
+---
+
 smart-configuration-metadata:
   authorization_endpoint: ${hspc.platform.authorization.url}/authorize
   token_endpoint: ${hspc.platform.authorization.url}/token
