@@ -32,6 +32,7 @@ import ca.uhn.fhir.jpa.provider.BaseJpaResourceProvider;
 import ca.uhn.fhir.jpa.provider.JpaSystemProviderDstu2;
 import ca.uhn.fhir.jpa.provider.dstu3.JpaSystemProviderDstu3;
 import ca.uhn.fhir.jpa.provider.r4.JpaSystemProviderR4;
+import ca.uhn.fhir.jpa.provider.r5.JpaSystemProviderR5;
 import ca.uhn.fhir.jpa.search.DatabaseBackedPagingProvider;
 import ca.uhn.fhir.jpa.searchparam.registry.ISearchParamRegistry;
 import ca.uhn.fhir.model.dstu2.composite.MetaDt;
@@ -123,6 +124,9 @@ public class FhirRestServlet extends RestfulServer {
         } else if (fhirVersion == FhirVersionEnum.R4) {
             resourceProviders = myAppCtx.getBean("myResourceProvidersR4", ResourceProviderFactory.class);
             systemProvider = myAppCtx.getBean("mySystemProviderR4", JpaSystemProviderR4.class);
+        } else if (fhirVersion == FhirVersionEnum.R5) {
+            resourceProviders = myAppCtx.getBean("myResourceProvidersR5", ResourceProviderFactory.class);
+            systemProvider = myAppCtx.getBean("mySystemProviderR5", JpaSystemProviderR5.class);
         } else {
             throw new IllegalStateException();
         }
@@ -168,6 +172,14 @@ public class FhirRestServlet extends RestfulServer {
 //            EvaluationProviderFactory providerFactory = new ProviderFactory(this.fhirContext, this.registry, localSystemTerminologyProvider);
 
 //            resolveProvidersR4(providerFactory, localSystemTerminologyProvider, this.registry);
+        } else if (fhirVersion == FhirVersionEnum.R5) {
+            IFhirSystemDao<org.hl7.fhir.r5.model.Bundle, org.hl7.fhir.r5.model.Meta> systemDao = myAppCtx.getBean("mySystemDaoR5", IFhirSystemDao.class);
+            HspcConformanceProviderR5 confProvider = new HspcConformanceProviderR5(this, systemDao,
+                    myAppCtx.getBean(DaoConfig.class),
+                    myAppCtx.getBean(MetadataRepositoryR5Impl.class),
+                    myAppCtx.getBean(ISearchParamRegistry.class));
+            confProvider.setImplementationDescription(serverDescription);
+            setServerConformanceProvider(confProvider);
         } else {
             throw new IllegalStateException();
         }
