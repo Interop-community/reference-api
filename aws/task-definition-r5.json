@@ -1,0 +1,52 @@
+{
+  "family": "api-v8-r5-test",
+  "containerDefinitions": [
+    {
+      "name": "api-v8-r5-test",
+      "image": "hspconsortium/api:{{PROJECT_VERSION}}",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 8071,
+          "hostPort": 0,
+          "protocol": "tcp"
+        }
+      ],
+      "memory": 3072,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/api-v8-r5-test",
+          "awslogs-region": "us-west-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "mountPoints": [
+        {
+          "readOnly": false,
+          "containerPath": "/var/indexes",
+          "sourceVolume": "indexes"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "JASYPT_ENCRYPTOR_PASSWORD",
+          "value": ""
+        },
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "test,multitenant,r5"
+        }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "indexes",
+      "host": {
+        "sourcePath": "/var/ecs/indexes"
+      }
+    }
+  ]
+}
