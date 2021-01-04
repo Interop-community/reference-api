@@ -21,7 +21,7 @@
 package org.hspconsortium.platform.api.config;
 
 import ca.uhn.fhir.jpa.api.svc.ISearchCoordinatorSvc;
-import ca.uhn.fhir.jpa.config.BaseJavaConfigR4;
+import ca.uhn.fhir.jpa.config.BaseJavaConfigR5;
 import ca.uhn.fhir.jpa.search.DatabaseBackedPagingProvider;
 import org.hspconsortium.platform.api.search.LogicaSearchCoordinatorSvcImpl;
 import org.springframework.beans.factory.annotation.Autowire;
@@ -32,8 +32,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
 @Configuration
-@Profile("r4")
-public class FhirServerConfigR4 extends BaseJavaConfigR4 {
+@Profile("r5")
+public class FhirServerConfigR5 extends BaseJavaConfigR5 {
 
     @Value("${hspc.platform.api.fhir.maxPageSize}")
     private Integer maxPageSize;
