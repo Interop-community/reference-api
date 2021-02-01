@@ -35,7 +35,6 @@ pipelines:
             - export PROJECT_NAME="api-v8-r4"
             - . ci-0-set-properties.sh
             - . ci-1-prepare-sources.sh
-            - . ci-2-build-project.sh
             # R5
             - export FHIR_VERSION="r5"
             - export PROJECT_NAME="api-v8-r5"
@@ -132,7 +131,6 @@ pipelines:
             - export PROJECT_NAME="api-v8-r4"
             - . ci-0-set-properties.sh
             - . ci-1-prepare-sources.sh
-            - . ci-2-build-project.sh
             # R5
             - export FHIR_VERSION="r5"
             - export PROJECT_NAME="api-v8-r5"
