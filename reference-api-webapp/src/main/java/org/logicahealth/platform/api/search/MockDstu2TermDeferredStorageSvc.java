@@ -1,6 +1,7 @@
 package org.logicahealth.platform.api.search;
 
 import ca.uhn.fhir.jpa.entity.TermCodeSystem;
+import ca.uhn.fhir.jpa.entity.TermCodeSystemVersion;
 import ca.uhn.fhir.jpa.entity.TermConcept;
 import ca.uhn.fhir.jpa.entity.TermConceptParentChildLink;
 import ca.uhn.fhir.jpa.model.entity.ResourceTable;
@@ -53,6 +54,11 @@ public class MockDstu2TermDeferredStorageSvc implements ITermDeferredStorageSvc 
 
     @Override
     public void deleteCodeSystemForResource(ResourceTable resourceTable) {
+        throw new UnsupportedOperationException("This class is not implemented in DSTU2");
+    }
+
+    @Override
+    public void deleteCodeSystemVersion(TermCodeSystemVersion termCodeSystemVersion) {
         throw new UnsupportedOperationException("This class is not implemented in DSTU2");
     }
 

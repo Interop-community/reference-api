@@ -24,6 +24,7 @@ import ca.uhn.fhir.jpa.search.cache.ISearchResultCacheSvc;
 import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.jpa.util.InterceptorUtil;
 import ca.uhn.fhir.jpa.util.JpaInterceptorBroadcaster;
+import ca.uhn.fhir.model.api.IQueryParameterType;
 import ca.uhn.fhir.model.api.Include;
 import ca.uhn.fhir.rest.api.CacheControlDirective;
 import ca.uhn.fhir.rest.api.Constants;
@@ -275,7 +276,7 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
     }
 
     @Override
-    public IBundleProvider registerSearch(final IFhirResourceDao theCallingDao, final SearchParameterMap theParams, String theResourceType, CacheControlDirective theCacheControlDirective, RequestDetails theRequestDetails) {
+    public IBundleProvider registerSearch(final IFhirResourceDao theCallingDao, final SearchParameterMap theParams, String theResourceType, CacheControlDirective theCacheControlDirective, RequestDetails theRequestDetails, RequestPartitionId theRequestPartitionId) {
         final String searchUuid = UUID.randomUUID().toString();
 
         ourLog.debug("Registering new search {}", searchUuid);
@@ -288,7 +289,7 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
 
         if (theParams.isLoadSynchronous() || loadSynchronousUpTo != null) {
             ourLog.debug("Search {} is loading in synchronous mode", searchUuid);
-            return executeQuery(theResourceType, theParams, theRequestDetails, searchUuid, sb, loadSynchronousUpTo);
+            return executeQuery(theResourceType, theParams, theRequestDetails, searchUuid, sb, loadSynchronousUpTo, theRequestPartitionId);
         }
 
         /*
@@ -303,14 +304,14 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
         final String queryString = theParams.toNormalizedQueryString(myContext);
         if (theParams.getEverythingMode() == null) {
             if (myDaoConfig.getReuseCachedSearchResultsForMillis() != null && useCache) {
-                IBundleProvider foundSearchProvider = findCachedQuery(theCallingDao, theParams, theResourceType, theRequestDetails, queryString);
+                IBundleProvider foundSearchProvider = findCachedQuery(theCallingDao, theParams, theResourceType, theRequestDetails, queryString, theRequestPartitionId);
                 if (foundSearchProvider != null) {
                     return foundSearchProvider;
                 }
             }
         }
 
-        return submitSearch(theCallingDao, theParams, theResourceType, theRequestDetails, searchUuid, sb, queryString);
+        return submitSearch(theCallingDao, theParams, theResourceType, theRequestDetails, searchUuid, sb, queryString, theRequestPartitionId);
 
     }
 
@@ -347,10 +348,10 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
     }
 
     @NotNull
-    private IBundleProvider submitSearch(IDao theCallingDao, SearchParameterMap theParams, String theResourceType, RequestDetails theRequestDetails, String theSearchUuid, ISearchBuilder theSb, String theQueryString) {
+    private IBundleProvider submitSearch(IDao theCallingDao, SearchParameterMap theParams, String theResourceType, RequestDetails theRequestDetails, String theSearchUuid, ISearchBuilder theSb, String theQueryString, RequestPartitionId theRequestPartitionId) {
         StopWatch w = new StopWatch();
         Search search = new Search();
-        populateSearchEntity(theParams, theResourceType, theSearchUuid, theQueryString, search);
+        populateSearchEntity(theParams, theResourceType, theSearchUuid, theQueryString, search, theRequestPartitionId);
 
         // Interceptor call: STORAGE_PRESEARCH_REGISTERED
         HookParams params = new HookParams()
@@ -359,9 +360,7 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
                 .addIfMatchesType(ServletRequestDetails.class, theRequestDetails);
         JpaInterceptorBroadcaster.doCallHooks(myInterceptorBroadcaster, theRequestDetails, Pointcut.STORAGE_PRESEARCH_REGISTERED, params);
 
-        RequestPartitionId requestPartitionId = myRequestPartitionHelperService.determineReadPartitionForRequest(theRequestDetails, theResourceType);
-
-        SearchTask task = new SearchTask(search, theCallingDao, theParams, theResourceType, theRequestDetails, requestPartitionId);
+        SearchTask task = new SearchTask(search, theCallingDao, theParams, theResourceType, theRequestDetails, theRequestPartitionId);
         myIdToSearchTask.put(search.getUuid(), task);
         FutureTask<Void> futureTask = new FutureTask<Void>(task);
         Thread searchThread = new Thread(futureTask);
@@ -375,7 +374,7 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
     }
 
     @org.jetbrains.annotations.Nullable
-    private IBundleProvider findCachedQuery(IDao theCallingDao, SearchParameterMap theParams, String theResourceType, RequestDetails theRequestDetails, String theQueryString) {
+    private IBundleProvider findCachedQuery(IDao theCallingDao, SearchParameterMap theParams, String theResourceType, RequestDetails theRequestDetails, String theQueryString, RequestPartitionId theRequestPartitionId) {
         TransactionTemplate txTemplate = new TransactionTemplate(myManagedTxManager);
         LogicaPersistedJpaBundleProvider foundSearchProvider = txTemplate.execute(t -> {
 
@@ -390,7 +389,7 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
             }
 
             // Check for a search matching the given hash
-            Search searchToUse = findSearchToUseOrNull(theQueryString, theResourceType);
+            Search searchToUse = findSearchToUseOrNull(theQueryString, theResourceType, theRequestPartitionId);
             if (searchToUse == null) {
                 return null;
             }
@@ -417,27 +416,21 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
     }
 
     @Nullable
-    private Search findSearchToUseOrNull(String theQueryString, String theResourceType) {
+    private Search findSearchToUseOrNull(String theQueryString, String theResourceType, RequestPartitionId theRequestPartitionId) {
         Search searchToUse = null;
 
         // createdCutoff is in recent past
         final Instant createdCutoff = Instant.now().minus(myDaoConfig.getReuseCachedSearchResultsForMillis(), ChronoUnit.MILLIS);
-        Collection<Search> candidates = mySearchCacheSvc.findCandidatesForReuse(theResourceType, theQueryString, theQueryString.hashCode(), Date.from(createdCutoff));
-
-        for (Search nextCandidateSearch : candidates) {
-            // We should only reuse our search if it was created within the permitted window
-            // Date.after() is unreliable.  Instant.isAfter() always works.
-            if (theQueryString.equals(nextCandidateSearch.getSearchQueryString()) && nextCandidateSearch.getCreated().toInstant().isAfter(createdCutoff)) {
-                searchToUse = nextCandidateSearch;
-                break;
-            }
-        }
-        return searchToUse;
+        Optional<Search> candidate = mySearchCacheSvc.findCandidatesForReuse(theResourceType, theQueryString, createdCutoff, theRequestPartitionId);
+        return candidate.orElse(null);
     }
 
-    private IBundleProvider executeQuery(String theResourceType, SearchParameterMap theParams, RequestDetails theRequestDetails, String theSearchUuid, ISearchBuilder theSb, Integer theLoadSynchronousUpTo) {
+    private IBundleProvider executeQuery(String theResourceType, SearchParameterMap theParams, RequestDetails theRequestDetails, String theSearchUuid, ISearchBuilder theSb, Integer theLoadSynchronousUpTo, RequestPartitionId theRequestPartitionId) {
         SearchRuntimeDetails searchRuntimeDetails = new SearchRuntimeDetails(theRequestDetails, theSearchUuid);
         searchRuntimeDetails.setLoadSynchronous(true);
+
+        boolean wantOnlyCount = isWantOnlyCount(theParams);
+        boolean wantCount = isWantCount(theParams, wantOnlyCount);
 
         // Execute the query and make sure we return distinct results
         TransactionTemplate txTemplate = new TransactionTemplate(myManagedTxManager);
@@ -447,9 +440,31 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
             // Load the results synchronously
             final List<ResourcePersistentId> pids = new ArrayList<>();
 
-            RequestPartitionId requestPartitionId = myRequestPartitionHelperService.determineReadPartitionForRequest(theRequestDetails, theResourceType);
+            Long count = 0L;
+            if (wantCount) {
+                ourLog.trace("Performing count");
+                // TODO FulltextSearchSvcImpl will remove necessary parameters from the "theParams", this will cause actual query after count to
+                //  return wrong response. This is some dirty fix to avoid that issue. Params should not be mutated?
+                //  Maybe instead of removing them we could skip them in db query builder if full text search was used?
+                List<List<IQueryParameterType>> contentAndTerms = theParams.get(Constants.PARAM_CONTENT);
+                List<List<IQueryParameterType>> textAndTerms = theParams.get(Constants.PARAM_TEXT);
 
-            try (IResultIterator resultIter = theSb.createQuery(theParams, searchRuntimeDetails, theRequestDetails, requestPartitionId)) {
+                Iterator<Long> countIterator = theSb.createCountQuery(theParams, theSearchUuid, theRequestDetails, theRequestPartitionId);
+
+                if (contentAndTerms != null) theParams.put(Constants.PARAM_CONTENT, contentAndTerms);
+                if (textAndTerms != null) theParams.put(Constants.PARAM_TEXT, textAndTerms);
+
+                count = countIterator.next();
+                ourLog.trace("Got count {}", count);
+            }
+
+            if (wantOnlyCount) {
+                SimpleBundleProvider bundleProvider = new SimpleBundleProvider();
+                bundleProvider.setSize(count.intValue());
+                return bundleProvider;
+            }
+
+            try (IResultIterator resultIter = theSb.createQuery(theParams, searchRuntimeDetails, theRequestDetails, theRequestPartitionId)) {
                 while (resultIter.hasNext()) {
                     pids.add(resultIter.next());
                     if (theLoadSynchronousUpTo != null && pids.size() >= theLoadSynchronousUpTo) {
@@ -567,6 +582,12 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
     @VisibleForTesting
     public void setSearchBuilderFactoryForUnitTest(SearchBuilderFactory theSearchBuilderFactory) {
         mySearchBuilderFactory = theSearchBuilderFactory;
+    }
+
+    private boolean isWantCount(SearchParameterMap myParams, boolean wantOnlyCount) {
+        return wantOnlyCount ||
+                SearchTotalModeEnum.ACCURATE.equals(myParams.getSearchTotalMode()) ||
+                (myParams.getSearchTotalMode() == null && SearchTotalModeEnum.ACCURATE.equals(myDaoConfig.getDefaultTotalMode()));
     }
 
     /**
@@ -963,13 +984,8 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
              *
              * before doing anything else.
              */
-            boolean wantOnlyCount =
-                    SummaryEnum.COUNT.equals(myParams.getSummaryMode())
-                            | INTEGER_0.equals(myParams.getCount());
-            boolean wantCount =
-                    wantOnlyCount ||
-                            SearchTotalModeEnum.ACCURATE.equals(myParams.getSearchTotalMode()) ||
-                            (myParams.getSearchTotalMode() == null && SearchTotalModeEnum.ACCURATE.equals(myDaoConfig.getDefaultTotalMode()));
+            boolean wantOnlyCount = isWantOnlyCount(myParams);
+            boolean wantCount = isWantCount(myParams, wantOnlyCount);
             if (wantCount) {
                 ourLog.trace("Performing count");
                 ISearchBuilder sb = newSearchBuilder();
@@ -1137,8 +1153,12 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
 
     }
 
+    private static boolean isWantOnlyCount(SearchParameterMap myParams) {
+        return SummaryEnum.COUNT.equals(myParams.getSummaryMode())
+                | INTEGER_0.equals(myParams.getCount());
+    }
 
-    public static void populateSearchEntity(SearchParameterMap theParams, String theResourceType, String theSearchUuid, String theQueryString, Search theSearch) {
+    public static void populateSearchEntity(SearchParameterMap theParams, String theResourceType, String theSearchUuid, String theQueryString, Search theSearch, RequestPartitionId theRequestPartitionId) {
         theSearch.setDeleted(false);
         theSearch.setUuid(theSearchUuid);
         theSearch.setCreated(new Date());
@@ -1149,9 +1169,7 @@ public class LogicaSearchCoordinatorSvcImpl implements ISearchCoordinatorSvc {
         theSearch.setLastUpdated(theParams.getLastUpdated());
         theSearch.setResourceType(theResourceType);
         theSearch.setStatus(SearchStatusEnum.LOADING);
-
-        theSearch.setSearchQueryString(theQueryString);
-        theSearch.setSearchQueryStringHash(theQueryString.hashCode());
+        theSearch.setSearchQueryString(theQueryString, theRequestPartitionId);
 
         for (Include next : theParams.getIncludes()) {
             theSearch.addInclude(new SearchInclude(theSearch, next.getValue(), false, next.isRecurse()));

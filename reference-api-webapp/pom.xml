@@ -36,12 +36,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <version>2.4.1</version>
         </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot</artifactId>
-            <version>2.2.6.RELEASE</version>
         </dependency>
 
         <dependency>
@@ -73,7 +73,11 @@
             <artifactId>hapi-fhir-base</artifactId>
             <version>${hapi.version}</version>
         </dependency>
-
+        <dependency>
+            <groupId>ca.uhn.hapi.fhir</groupId>
+            <artifactId>hapi-fhir-jpaserver-base</artifactId>
+            <version>${hapi.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-compress</artifactId>
@@ -150,7 +154,6 @@
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
         </dependency>
-
         <!-- This dependency includes the JPA server itself, which is packaged separately from the rest of HAPI FHIR -->
         <dependency>
             <groupId>ca.uhn.hapi.fhir</groupId>
@@ -183,6 +186,12 @@
             <groupId>com.github.ulisesbocchio</groupId>
             <artifactId>jasypt-spring-boot-starter</artifactId>
             <version>3.0.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>net.ttddyy</groupId>
+            <artifactId>datasource-proxy</artifactId>
+            <version>1.7</version>
         </dependency>
 
         <!-- Only required for narrative generator support -->
@@ -221,11 +230,6 @@
                     <artifactId>ehcache-core</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.hibernate</groupId>
-            <artifactId>hibernate-search-orm</artifactId>
-            <version>5.11.5.Final</version>
         </dependency>
         <dependency>
             <groupId>org.hibernate</groupId>
@@ -298,7 +302,7 @@
             <plugin>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-maven-plugin</artifactId>
-                <version>9.4.30.v20200611</version>
+                <version>9.4.35.v20201120</version>
             </plugin>
             <plugin>
                 <groupId>org.apache.tomcat.maven</groupId>

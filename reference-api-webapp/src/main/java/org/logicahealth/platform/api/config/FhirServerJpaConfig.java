@@ -27,8 +27,11 @@ import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.config.HapiFhirLocalContainerEntityManagerFactoryBean;
 import ca.uhn.fhir.jpa.interceptor.CascadingDeleteInterceptor;
 import ca.uhn.fhir.jpa.model.entity.ModelConfig;
+import ca.uhn.fhir.jpa.search.HapiLuceneAnalysisConfigurer;
 import ca.uhn.fhir.rest.server.interceptor.LoggingInterceptor;
 import ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor;
+import org.elasticsearch.client.Node;
+import org.elasticsearch.client.RestClient;
 import org.hibernate.MultiTenancyStrategy;
 import org.hibernate.cfg.Environment;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
@@ -113,15 +116,18 @@ public class FhirServerJpaConfig {
         extraProperties.put("hibernate.cache.use_second_level_cache", "false");
         extraProperties.put("hibernate.cache.use_structured_entries", "false");
         extraProperties.put("hibernate.cache.use_minimal_puts", "false");
-        extraProperties.put("hibernate.search.default.directory_provider", "filesystem");
-        extraProperties.put("hibernate.search.default.indexBase", "target/lucenefiles");
-        extraProperties.put("hibernate.search.lucene_version", "LUCENE_CURRENT");
-        extraProperties.put("hibernate.search.autoregister_listeners", "false"); // set to false to disable lucene
+        extraProperties.put("hibernate.search.backend.type", "lucene");
+        extraProperties.put("hibernate.search.backend.multi_tenancy.strategy", "discriminator");
+        extraProperties.put("spring.jpa.properties.hibernate.search.backend.analysis.configurer", "com.example.springmvcrest.services.MyLuceneAnalysisConfigurer");
+        extraProperties.put("hibernate.search.backend.analysis.configurer", HapiLuceneAnalysisConfigurer.class.getName());
+        //extraProperties.put("hibernate.search.default.directory_provider", "filesystem");
+        //extraProperties.put("hibernate.search.default.indexBase", "target/lucenefiles");
+        //extraProperties.put("hibernate.search.lucene_version", "LUCENE_CURRENT");
+        //extraProperties.put("hibernate.search.autoregister_listeners", "false"); // set to false to disable lucene
         // multi-tenant properties
         extraProperties.put(Environment.MULTI_TENANT, MultiTenancyStrategy.DATABASE);
         extraProperties.put(Environment.MULTI_TENANT_CONNECTION_PROVIDER, multiTenantConnectionProvider);
         extraProperties.put(Environment.MULTI_TENANT_IDENTIFIER_RESOLVER, currentTenantIdentifierResolver);
-
         return extraProperties;
     }
 
