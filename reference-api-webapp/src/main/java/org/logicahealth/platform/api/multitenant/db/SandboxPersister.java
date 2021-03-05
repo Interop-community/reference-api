@@ -384,6 +384,8 @@ public class SandboxPersister {
             return FhirMultiTenantController.STU3_PROFILE_NAME;
         } else if (profile.contains(FhirMultiTenantController.R4_PROFILE_NAME)) {
             return FhirMultiTenantController.R4_PROFILE_NAME;
+        } else if (profile.contains(FhirMultiTenantController.R5_PROFILE_NAME)) {
+            return FhirMultiTenantController.R5_PROFILE_NAME;
         }
 
         throw new IllegalArgumentException("No valid FHIR version profile is set.");

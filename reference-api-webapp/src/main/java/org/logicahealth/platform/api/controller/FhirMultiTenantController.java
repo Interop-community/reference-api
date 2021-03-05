@@ -47,6 +47,7 @@ public class FhirMultiTenantController extends ServletForwardingController {
     public static final String DSTU2_PROFILE_NAME = "dstu2";
     public static final String STU3_PROFILE_NAME = "stu3";
     public static final String R4_PROFILE_NAME = "r4";
+    public static final String R5_PROFILE_NAME = "r5";
 
     @Autowired
     private TenantManagementService tenantManagementService;
