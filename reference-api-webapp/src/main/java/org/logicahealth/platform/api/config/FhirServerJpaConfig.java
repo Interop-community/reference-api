@@ -30,6 +30,7 @@ import ca.uhn.fhir.jpa.model.entity.ModelConfig;
 import ca.uhn.fhir.jpa.search.HapiLuceneAnalysisConfigurer;
 import ca.uhn.fhir.rest.server.interceptor.LoggingInterceptor;
 import ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor;
+import org.apache.lucene.util.Version;
 import org.elasticsearch.client.Node;
 import org.elasticsearch.client.RestClient;
 import org.hibernate.MultiTenancyStrategy;
@@ -38,6 +39,7 @@ import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
 import org.hibernate.engine.jdbc.connections.spi.MultiTenantConnectionProvider;
 import org.hibernate.search.backend.lucene.cfg.LuceneBackendSettings;
 import org.hibernate.search.backend.lucene.cfg.LuceneIndexSettings;
+import org.hibernate.search.backend.lucene.lowlevel.directory.impl.LocalFileSystemDirectoryProvider;
 import org.hibernate.search.engine.cfg.BackendSettings;
 import org.hibernate.search.mapper.orm.cfg.HibernateOrmMapperSettings;
 import org.logicahealth.platform.api.multitenant.db.DataSourceRepository;
@@ -46,6 +48,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
@@ -54,6 +57,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 import java.util.Properties;
+import java.util.function.Supplier;
 
 @Configuration
 @EnableTransactionManagement
@@ -65,6 +69,10 @@ public class FhirServerJpaConfig {
     @Autowired
     @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
     private FhirContext fhirContext;
+
+    @Autowired
+    private Supplier<String> luceneIndexFilesLocation;
+
     /**
      * Configure FHIR properties around the the JPA server via this bean
      */
@@ -123,11 +131,12 @@ public class FhirServerJpaConfig {
         extraProperties.put("hibernate.search.backend.type", "lucene");
         extraProperties.put("hibernate.search.backend.discovery.enabled", true);
         extraProperties.put("hibernate.search.backend.multi_tenancy.strategy", "discriminator");
-        extraProperties.put(HibernateOrmMapperSettings.ENABLED, false);
-        //extraProperties.put("hibernate.search.default.directory_provider", "filesystem");
-        //extraProperties.put("hibernate.search.default.indexBase", "target/lucenefiles");
-        //extraProperties.put("hibernate.search.lucene_version", "LUCENE_CURRENT");
-        //extraProperties.put("hibernate.search.autoregister_listeners", "false"); // set to false to disable lucene
+        extraProperties.put(HibernateOrmMapperSettings.ENABLED, true);
+        extraProperties.putIfAbsent(BackendSettings.backendKey(BackendSettings.TYPE), LuceneBackendSettings.TYPE_NAME);
+        extraProperties.putIfAbsent(BackendSettings.backendKey(LuceneIndexSettings.DIRECTORY_TYPE), LocalFileSystemDirectoryProvider.NAME);
+        extraProperties.putIfAbsent(BackendSettings.backendKey(LuceneIndexSettings.DIRECTORY_ROOT), luceneIndexFilesLocation.get());
+        extraProperties.putIfAbsent(BackendSettings.backendKey(LuceneBackendSettings.ANALYSIS_CONFIGURER), HapiLuceneAnalysisConfigurer.class.getName());
+        extraProperties.putIfAbsent(BackendSettings.backendKey(LuceneBackendSettings.LUCENE_VERSION), Version.LATEST);
         // multi-tenant properties
         extraProperties.put(Environment.MULTI_TENANT, MultiTenancyStrategy.DATABASE);
         extraProperties.put(Environment.MULTI_TENANT_CONNECTION_PROVIDER, multiTenantConnectionProvider);
@@ -168,6 +177,30 @@ public class FhirServerJpaConfig {
     @Bean
     public CascadingDeleteInterceptor cascadingDeleteInterceptor (DaoRegistry theDaoRegistry, IInterceptorBroadcaster theInterceptorBroadcaster) {
         return new CascadingDeleteInterceptor(fhirContext, theDaoRegistry, theInterceptorBroadcaster);
+    }
+
+    @Bean
+    @Profile("dstu2")
+    public Supplier<String> getDstu2IndexLocation() {
+        return () -> "target/lucenefiles/dstu2";
+    }
+
+    @Bean
+    @Profile("stu3")
+    public Supplier<String> getStu3IndexLocation() {
+        return () -> "target/lucenefiles/stu3";
+    }
+
+    @Bean
+    @Profile("r4")
+    public Supplier<String> getR4IndexLocation() {
+        return () -> "target/lucenefiles/r4";
+    }
+
+    @Bean
+    @Profile("r5")
+    public Supplier<String> getR5IndexLocation() {
+        return () -> "target/lucenefiles/r5";
     }
 
 }
