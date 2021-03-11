@@ -1,21 +1,21 @@
 /**
- *  * #%L
- *  *
- *  * %%
- *  * Copyright (C) 2014-2020 Healthcare Services Platform Consortium
- *  * %%
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  *      http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
- *  * #L%
+ ** #%L
+ **
+ ** %%
+ ** Copyright (C) 2014-2020 Healthcare Services Platform Consortium
+ ** %%
+ ** Licensed under the Apache License, Version 2.0 (the "License");
+ ** you may not use this file except in compliance with the License.
+ ** You may obtain a copy of the License at
+ **
+ **      http://www.apache.org/licenses/LICENSE-2.0
+ **
+ ** Unless required by applicable law or agreed to in writing, software
+ ** distributed under the License is distributed on an "AS IS" BASIS,
+ ** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ ** See the License for the specific language governing permissions and
+ ** limitations under the License.
+ ** #L%
  */
 
 package org.logicahealth.platform.api.controller;
@@ -36,16 +36,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.common.exceptions.UnauthorizedUserException;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.constraints.NotNull;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @RestController
 @RequestMapping("${hspc.platform.api.sandboxPath:/{teamId}/sandbox}")
@@ -94,6 +101,27 @@ public class MultitenantSandboxController {
         return newSandbox;
     }
 
+    @GetMapping(value = "/download", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public void downloadSandbox(HttpServletRequest request, @PathVariable String teamId, final HttpServletResponse response) throws IOException {
+        if (!sandboxService.verifyUser(request, teamId)) {
+            throw new UnauthorizedUserException("User not authorized to download sandbox " + teamId);
+        }
+        var dumpFileName = sandboxService.sandboxSchemaDump(sandboxService.get(teamId));
+        try (var zipOutputStream = new ZipOutputStream(response.getOutputStream());
+             var fileInputStream = new FileInputStream(new File("./" + dumpFileName));) {
+            var zipEntry = new ZipEntry("schema.sql");
+            zipOutputStream.putNextEntry(zipEntry);
+            byte[] bytes = new byte[1024];
+            int length;
+            while ((length = fileInputStream.read(bytes)) >= 0) {
+                zipOutputStream.write(bytes, 0, length);
+            }
+            response.flushBuffer();
+        } catch (final IOException e) {
+            logger.error("Exception while reading and streaming data {} ", e);
+        }
+    }
+
     @RequestMapping(method = RequestMethod.GET)
     public Sandbox get(HttpServletRequest request, @PathVariable String teamId) {
         Sandbox existing = sandboxService.get(teamId);
@@ -104,7 +132,7 @@ public class MultitenantSandboxController {
     }
 
     @RequestMapping(method = RequestMethod.DELETE)
-    public boolean delete(HttpServletRequest request,@PathVariable String teamId) {
+    public boolean delete(HttpServletRequest request, @PathVariable String teamId) {
         validate(teamId);
         if (!sandboxService.verifyUser(request, teamId)) {
             throw new UnauthorizedUserException("User not authorized to delete sandbox " + teamId);
@@ -122,14 +150,16 @@ public class MultitenantSandboxController {
     }
 
     @GetMapping("/echo/**")
-    public @ResponseBody ResponseEntity<String> echoGet(HttpServletRequest request) {
+    public @ResponseBody
+    ResponseEntity<String> echoGet(HttpServletRequest request) {
         String message = "Received " + request.getMethod() + ", request path: " + request.getRequestURI();
         logger.info(message);
         return new ResponseEntity<>(message, HttpStatus.OK);
     }
 
     @PostMapping("/echo/**")
-    public @ResponseBody ResponseEntity<String> echoPost(HttpServletRequest request, @RequestBody Object obj) {
+    public @ResponseBody
+    ResponseEntity<String> echoPost(HttpServletRequest request, @RequestBody Object obj) {
         StringBuilder sb = new StringBuilder();
         sb.append("Received " + request.getMethod() + ", request path: " + request.getRequestURI());
         sb.append("Received POST request body: " + obj);
@@ -139,7 +169,8 @@ public class MultitenantSandboxController {
     }
 
     @PutMapping("/echo/**")
-    public @ResponseBody ResponseEntity<String> echoPut(HttpServletRequest request, @RequestBody Object obj) {
+    public @ResponseBody
+    ResponseEntity<String> echoPut(HttpServletRequest request, @RequestBody Object obj) {
         StringBuilder sb = new StringBuilder();
         sb.append("Received " + request.getMethod() + ", request path: " + request.getRequestURI());
         sb.append("Received PUT request body: " + obj);

@@ -299,6 +299,26 @@ public class SandboxPersister {
         }
     }
 
+    public void dumpSandboxSchema(Sandbox sandbox, String sandboxDumpFilename) {
+        String sandboxSchemaName = toSchemaName.apply(sandbox);
+        try {
+            String dump = "mysqldump -h " + dbhost + " -u " + dbusername + " -p'" + dbpassword + "' " + sandboxSchemaName + " > ./" + sandboxDumpFilename;
+            String[] cmdarray = {"/bin/sh","-c", dump};
+            Process pr = Runtime.getRuntime().exec(cmdarray);
+            Integer outcome = pr.waitFor();
+            BufferedReader in = new BufferedReader(new InputStreamReader(pr.getErrorStream()));
+            String error = IOUtils.toString(in);
+            if (outcome == 0) {
+                logger.info("Mysql dump successful.");
+            } else {
+                throw new Exception(error);
+            }
+        } catch (Exception e) {
+            logger.info("Error in creation of sandbox schema dump.", e);
+            throw new RuntimeException(e);
+        }
+    }
+
     public boolean loadInitialDataset(Sandbox sandbox, DataSet starterDataSet) {
         boolean success = false;
         logger.info("loadInitialDataset [" + starterDataSet + "] in sandbox [" + sandbox.toString() + "]");

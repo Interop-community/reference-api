@@ -38,6 +38,8 @@ public interface SandboxService {
 
     void clone(@NotNull Sandbox newSandbox, @NotNull Sandbox clonedSandbox);
 
+    String sandboxSchemaDump(@NotNull Sandbox sandbox);
+
     Sandbox get(String teamId);
 
     boolean remove(String teamId);

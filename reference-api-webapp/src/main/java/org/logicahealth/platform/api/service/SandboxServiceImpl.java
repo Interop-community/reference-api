@@ -38,10 +38,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotNull;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.Collection;
+import java.util.UUID;
 
 @Component
 public class SandboxServiceImpl implements SandboxService {
@@ -147,6 +151,14 @@ public class SandboxServiceImpl implements SandboxService {
         }
 
         throw new IllegalArgumentException("The new sandbox already exists");
+    }
+
+    @Override
+    public String sandboxSchemaDump(@NotNull Sandbox sandbox) {
+        var sandboxDumpFilename = "dump" + sandbox.getTeamId() + UUID.randomUUID() + ".sql";
+        logger.info("Dumping schema for sandbox " + sandbox.getTeamId() + " into " + sandboxDumpFilename);
+        sandboxPersister.dumpSandboxSchema(sandbox, sandboxDumpFilename);
+        return sandboxDumpFilename;
     }
 
     @Override
