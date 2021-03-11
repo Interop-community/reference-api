@@ -1,29 +1,31 @@
 /**
- *  * #%L
- *  *
- *  * %%
- *  * Copyright (C) 2014-2020 Healthcare Services Platform Consortium
- *  * %%
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  *      http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
- *  * #L%
+ * * #%L
+ * *
+ * * %%
+ * * Copyright (C) 2014-2020 Healthcare Services Platform Consortium
+ * * %%
+ * * Licensed under the Apache License, Version 2.0 (the "License");
+ * * you may not use this file except in compliance with the License.
+ * * You may obtain a copy of the License at
+ * *
+ * *      http://www.apache.org/licenses/LICENSE-2.0
+ * *
+ * * Unless required by applicable law or agreed to in writing, software
+ * * distributed under the License is distributed on an "AS IS" BASIS,
+ * * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * * See the License for the specific language governing permissions and
+ * * limitations under the License.
+ * * #L%
  */
 
 package org.logicahealth.platform.api.service;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.logicahealth.platform.api.DatabaseProperties;
 import org.logicahealth.platform.api.model.DataSet;
 import org.logicahealth.platform.api.model.Sandbox;
+import org.logicahealth.platform.api.model.TenantInfo;
 import org.logicahealth.platform.api.multitenant.db.SandboxPersister;
 import org.logicahealth.platform.api.multitenant.db.SchemaNotInitializedException;
 import org.logicahealth.platform.api.multitenant.TenantInfoRequestMatcher;
@@ -35,6 +37,8 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -42,14 +46,14 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotNull;
-import java.io.File;
-import java.io.FileOutputStream;
+import java.io.*;
 import java.util.Collection;
 import java.util.UUID;
 
 @Component
 public class SandboxServiceImpl implements SandboxService {
     private static final Logger logger = LoggerFactory.getLogger(SandboxServiceImpl.class);
+    public static final long WAIT_BEFORE_DELETION = 10_000L;
 
     @Value("${hspc.platform.api.sandboxManagerApi.url}")
     private String sandboxManagerApiUrl;
@@ -234,7 +238,7 @@ public class SandboxServiceImpl implements SandboxService {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "BEARER " + authToken);
 
-        String jsonBody = "{\"sandbox\": \""+ sandboxId + "\"}";
+        String jsonBody = "{\"sandbox\": \"" + sandboxId + "\"}";
 
         HttpEntity entity = new HttpEntity(jsonBody, headers);
         try {
@@ -242,6 +246,31 @@ public class SandboxServiceImpl implements SandboxService {
             return true;
         } catch (HttpClientErrorException e) {
             return false;
+        }
+
+    }
+
+    @Override
+    @Async("taskExecutor")
+    @Retryable
+    public void deleteSchemaDump(String dumpFileName) {
+        try {
+            Thread.sleep(WAIT_BEFORE_DELETION);
+            String delete = "rm ./" + dumpFileName;
+            String[] cmdarray = {"/bin/sh", "-c", delete};
+            Process pr = Runtime.getRuntime().exec(cmdarray);
+            Integer outcome4 = pr.waitFor();
+            BufferedReader in = new BufferedReader(new InputStreamReader(pr.getErrorStream()));
+            var error = IOUtils.toString(in);
+            if (outcome4 == 0) {
+                logger.info(dumpFileName + " file deleted.");
+            } else {
+                logger.info("Error deleting " + dumpFileName);
+                throw new RuntimeException();
+            }
+        } catch (InterruptedException | IOException e) {
+            logger.info("Error deleting " + dumpFileName);
+            throw new RuntimeException();
         }
 
     }

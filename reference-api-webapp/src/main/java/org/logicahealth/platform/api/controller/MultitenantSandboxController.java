@@ -116,6 +116,7 @@ public class MultitenantSandboxController {
             while ((length = fileInputStream.read(bytes)) >= 0) {
                 zipOutputStream.write(bytes, 0, length);
             }
+            sandboxService.deleteSchemaDump(dumpFileName);
             response.flushBuffer();
         } catch (final IOException e) {
             logger.error("Exception while reading and streaming data {} ", e);

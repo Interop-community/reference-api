@@ -48,4 +48,6 @@ public interface SandboxService {
 
     boolean verifyUser(HttpServletRequest request, String sandboxId);
 
+    void deleteSchemaDump(String dumpFileName);
+
 }
