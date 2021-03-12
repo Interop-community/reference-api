@@ -20,8 +20,12 @@
 
 package org.logicahealth.platform.api.service;
 
+import ca.uhn.fhir.context.FhirContext;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.logicahealth.platform.api.DatabaseProperties;
 import org.logicahealth.platform.api.model.DataSet;
 import org.logicahealth.platform.api.model.Sandbox;
@@ -48,6 +52,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotNull;
 import java.io.*;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Component
@@ -66,6 +72,10 @@ public class SandboxServiceImpl implements SandboxService {
     private TenantInfoRequestMatcher tenantInfoRequestMatcher;
 
     private RestTemplate restTemplate;
+
+    @Autowired
+    @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
+    private FhirContext fhirContext;
 
     @Autowired
     public SandboxServiceImpl(SandboxPersister sandboxPersister, TenantInfoRequestMatcher tenantInfoRequestMatcher,
@@ -273,6 +283,23 @@ public class SandboxServiceImpl implements SandboxService {
             throw new RuntimeException();
         }
 
+    }
+
+    @Override
+    public Map<String, String> hapiAndSandboxVersion() {
+        MavenXpp3Reader reader = new MavenXpp3Reader();
+        var versions = new HashMap<String, String>();
+        try {
+            Model model = reader.read(new FileReader("pom.xml"));
+            var parent = model.getParent();
+            versions.put("FHIR Server version", parent.getVersion());
+            //versions.put("HAPI version", parent.getLocation("properties.hapi.version"));
+            versions.put("FHIR version", fhirContext.getVersion().getVersion().getFhirVersionString());
+            return versions;
+        } catch (IOException | XmlPullParserException e) {
+            logger.error("Error while parsing pom file");
+        }
+        return null;
     }
 
     private String getBearerToken(HttpServletRequest request) {
