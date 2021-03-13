@@ -27,6 +27,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotNull;
 import java.util.Collection;
 import java.util.Map;
+import java.util.zip.ZipOutputStream;
 
 public interface SandboxService {
     void reset();
@@ -51,6 +52,6 @@ public interface SandboxService {
 
     void deleteSchemaDump(String dumpFileName);
 
-    Map<String, String> hapiAndSandboxVersion();
+    void writeZipFileToResponse(ZipOutputStream zipOutputStream, String dumpFileName);
 
 }

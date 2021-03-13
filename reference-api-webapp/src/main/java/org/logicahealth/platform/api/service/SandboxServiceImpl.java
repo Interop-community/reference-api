@@ -55,6 +55,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Component
 public class SandboxServiceImpl implements SandboxService {
@@ -286,16 +288,42 @@ public class SandboxServiceImpl implements SandboxService {
     }
 
     @Override
-    public Map<String, String> hapiAndSandboxVersion() {
+    public void writeZipFileToResponse(ZipOutputStream zipOutputStream, String dumpFileName) {
+        try {
+            var fileInputStream = new FileInputStream(new File("./" + dumpFileName));
+            addZipFileEntry(fileInputStream, new ZipEntry("schema.sql"), zipOutputStream);
+            fileInputStream.close();
+            var byteArrayInputStream = new ByteArrayInputStream(hapiAndSandboxVersions().getBytes());
+            addZipFileEntry(byteArrayInputStream, new ZipEntry("manifest"), zipOutputStream);
+            byteArrayInputStream.close();
+            zipOutputStream.close();
+        } catch (IOException e) {
+            logger.error("Exception while zipping schema dump", e);
+        }
+    }
+
+    private void addZipFileEntry(InputStream inputStream, ZipEntry zipEntry, ZipOutputStream zipOutputStream) {
+        try {
+            zipOutputStream.putNextEntry(zipEntry);
+            byte[] bytes = new byte[1024];
+            int length;
+            while ((length = inputStream.read(bytes)) >= 0) {
+                zipOutputStream.write(bytes, 0, length);
+            }
+        } catch (IOException e) {
+            logger.error("Exception while zipping schema dump", e);
+        }
+    }
+
+    private String hapiAndSandboxVersions() {
         MavenXpp3Reader reader = new MavenXpp3Reader();
-        var versions = new HashMap<String, String>();
+        StringBuilder versions = new StringBuilder();
         try {
             Model model = reader.read(new FileReader("pom.xml"));
-            var parent = model.getParent();
-            versions.put("FHIR Server version", parent.getVersion());
-            //versions.put("HAPI version", parent.getLocation("properties.hapi.version"));
-            versions.put("FHIR version", fhirContext.getVersion().getVersion().getFhirVersionString());
-            return versions;
+            versions.append("FHIR Server version: ").append(model.getVersion());
+            versions.append("\nHAPI version: ").append(model.getProperties().get("hapi.version").toString());
+            versions.append("\nFHIR version: ").append(fhirContext.getVersion().getVersion().name());
+            return versions.toString();
         } catch (IOException | XmlPullParserException e) {
             logger.error("Error while parsing pom file");
         }

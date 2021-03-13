@@ -103,24 +103,16 @@ public class MultitenantSandboxController {
 
     @GetMapping(value = "/download", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     public void downloadSandbox(HttpServletRequest request, @PathVariable String teamId, final HttpServletResponse response) throws IOException {
+        response.setContentType("application/zip");
+        response.setHeader("Content-Disposition","attachment;filename=sandbox.zip");
         if (!sandboxService.verifyUser(request, teamId)) {
             throw new UnauthorizedUserException("User not authorized to download sandbox " + teamId);
         }
         var dumpFileName = sandboxService.sandboxSchemaDump(sandboxService.get(teamId));
-        try (var zipOutputStream = new ZipOutputStream(response.getOutputStream());
-             var fileInputStream = new FileInputStream(new File("./" + dumpFileName));) {
-            var zipEntry = new ZipEntry("schema.sql");
-            zipOutputStream.putNextEntry(zipEntry);
-            byte[] bytes = new byte[1024];
-            int length;
-            while ((length = fileInputStream.read(bytes)) >= 0) {
-                zipOutputStream.write(bytes, 0, length);
-            }
-            sandboxService.deleteSchemaDump(dumpFileName);
-            response.flushBuffer();
-        } catch (final IOException e) {
-            logger.error("Exception while reading and streaming data {} ", e);
-        }
+        var zipOutputStream = new ZipOutputStream(response.getOutputStream());
+        sandboxService.writeZipFileToResponse(zipOutputStream, dumpFileName);
+        sandboxService.deleteSchemaDump(dumpFileName);
+        response.flushBuffer();
     }
 
     @RequestMapping(method = RequestMethod.GET)
