@@ -21,6 +21,7 @@
 package org.logicahealth.platform.api.service;
 
 import ca.uhn.fhir.context.FhirContext;
+import com.google.gson.Gson;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.maven.model.Model;
@@ -29,7 +30,6 @@ import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.logicahealth.platform.api.DatabaseProperties;
 import org.logicahealth.platform.api.model.DataSet;
 import org.logicahealth.platform.api.model.Sandbox;
-import org.logicahealth.platform.api.model.TenantInfo;
 import org.logicahealth.platform.api.multitenant.db.SandboxPersister;
 import org.logicahealth.platform.api.multitenant.db.SchemaNotInitializedException;
 import org.logicahealth.platform.api.multitenant.TenantInfoRequestMatcher;
@@ -46,14 +46,12 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotNull;
 import java.io.*;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -294,7 +292,7 @@ public class SandboxServiceImpl implements SandboxService {
             addZipFileEntry(fileInputStream, new ZipEntry("schema.sql"), zipOutputStream);
             fileInputStream.close();
             var byteArrayInputStream = new ByteArrayInputStream(hapiAndSandboxVersions().getBytes());
-            addZipFileEntry(byteArrayInputStream, new ZipEntry("manifest"), zipOutputStream);
+            addZipFileEntry(byteArrayInputStream, new ZipEntry("manifest.json"), zipOutputStream);
             byteArrayInputStream.close();
             zipOutputStream.close();
         } catch (IOException e) {
@@ -317,13 +315,13 @@ public class SandboxServiceImpl implements SandboxService {
 
     private String hapiAndSandboxVersions() {
         MavenXpp3Reader reader = new MavenXpp3Reader();
-        StringBuilder versions = new StringBuilder();
         try {
             Model model = reader.read(new FileReader("pom.xml"));
-            versions.append("FHIR Server version: ").append(model.getVersion());
-            versions.append("\nHAPI version: ").append(model.getProperties().get("hapi.version").toString());
-            versions.append("\nFHIR version: ").append(fhirContext.getVersion().getVersion().name());
-            return versions.toString();
+            var manifest = new HashMap<String, String>();
+            manifest.put("FHIR Server version", model.getVersion());
+            manifest.put("HAPI version", model.getProperties().get("hapi.version").toString());
+            manifest.put("FHIR version", fhirContext.getVersion().getVersion().name());
+            return new Gson().toJson(manifest);
         } catch (IOException | XmlPullParserException e) {
             logger.error("Error while parsing pom file");
         }
@@ -338,6 +336,5 @@ public class SandboxServiceImpl implements SandboxService {
         }
         return authToken.substring(7);
     }
-
 
 }
