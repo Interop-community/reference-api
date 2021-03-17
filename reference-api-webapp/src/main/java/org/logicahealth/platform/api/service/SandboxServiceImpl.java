@@ -60,6 +60,9 @@ import java.util.zip.ZipOutputStream;
 public class SandboxServiceImpl implements SandboxService {
     private static final Logger logger = LoggerFactory.getLogger(SandboxServiceImpl.class);
     public static final long WAIT_BEFORE_DELETION = 10_000L;
+    private static final String FHIR_SERVER_VERSION = "platform-version";
+    private static final String HAPI_VERSION = "hapi-version";
+    private static final String FHIR_VERSION = "fhir-version";
 
     @Value("${hspc.platform.api.sandboxManagerApi.url}")
     private String sandboxManagerApiUrl;
@@ -292,7 +295,7 @@ public class SandboxServiceImpl implements SandboxService {
             addZipFileEntry(fileInputStream, new ZipEntry("schema.sql"), zipOutputStream);
             fileInputStream.close();
             var byteArrayInputStream = new ByteArrayInputStream(hapiAndSandboxVersions().getBytes());
-            addZipFileEntry(byteArrayInputStream, new ZipEntry("manifest.json"), zipOutputStream);
+            addZipFileEntry(byteArrayInputStream, new ZipEntry("versions.json"), zipOutputStream);
             byteArrayInputStream.close();
             zipOutputStream.close();
         } catch (IOException e) {
@@ -318,9 +321,9 @@ public class SandboxServiceImpl implements SandboxService {
         try {
             Model model = reader.read(new FileReader("pom.xml"));
             var manifest = new HashMap<String, String>();
-            manifest.put("FHIR Server version", model.getVersion());
-            manifest.put("HAPI version", model.getProperties().get("hapi.version").toString());
-            manifest.put("FHIR version", fhirContext.getVersion().getVersion().name());
+            manifest.put(FHIR_SERVER_VERSION, model.getVersion());
+            manifest.put(HAPI_VERSION, model.getProperties().get("hapi.version").toString());
+            manifest.put(FHIR_VERSION, fhirContext.getVersion().getVersion().name());
             return new Gson().toJson(manifest);
         } catch (IOException | XmlPullParserException e) {
             logger.error("Error while parsing pom file");
