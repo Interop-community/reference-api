@@ -292,7 +292,7 @@ public class SandboxServiceImpl implements SandboxService {
     public void writeZipFileToResponse(ZipOutputStream zipOutputStream, String dumpFileName) {
         try {
             var fileInputStream = new FileInputStream(new File("./" + dumpFileName));
-            addZipFileEntry(fileInputStream, new ZipEntry("schema.sql"), zipOutputStream);
+            addZipFileEntry(fileInputStream, new ZipEntry("sandbox.sql"), zipOutputStream);
             fileInputStream.close();
             var byteArrayInputStream = new ByteArrayInputStream(hapiAndSandboxVersions().getBytes());
             addZipFileEntry(byteArrayInputStream, new ZipEntry("versions.json"), zipOutputStream);
