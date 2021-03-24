@@ -60,9 +60,9 @@ import java.util.zip.ZipOutputStream;
 public class SandboxServiceImpl implements SandboxService {
     private static final Logger logger = LoggerFactory.getLogger(SandboxServiceImpl.class);
     public static final long WAIT_BEFORE_DELETION = 10_000L;
-    private static final String FHIR_SERVER_VERSION = "platform-version";
-    private static final String HAPI_VERSION = "hapi-version";
-    private static final String FHIR_VERSION = "fhir-version";
+    private static final String FHIR_SERVER_VERSION = "platformVersion";
+    private static final String HAPI_VERSION = "hapiVersion";
+    private static final String FHIR_VERSION = "fhirVersion";
 
     @Value("${hspc.platform.api.sandboxManagerApi.url}")
     private String sandboxManagerApiUrl;
