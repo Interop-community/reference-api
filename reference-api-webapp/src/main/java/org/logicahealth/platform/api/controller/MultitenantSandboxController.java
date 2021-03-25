@@ -1,21 +1,21 @@
 /**
- ** #%L
- **
- ** %%
- ** Copyright (C) 2014-2020 Healthcare Services Platform Consortium
- ** %%
- ** Licensed under the Apache License, Version 2.0 (the "License");
- ** you may not use this file except in compliance with the License.
- ** You may obtain a copy of the License at
- **
- **      http://www.apache.org/licenses/LICENSE-2.0
- **
- ** Unless required by applicable law or agreed to in writing, software
- ** distributed under the License is distributed on an "AS IS" BASIS,
- ** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- ** See the License for the specific language governing permissions and
- ** limitations under the License.
- ** #L%
+ * * #%L
+ * *
+ * * %%
+ * * Copyright (C) 2014-2020 Healthcare Services Platform Consortium
+ * * %%
+ * * Licensed under the Apache License, Version 2.0 (the "License");
+ * * you may not use this file except in compliance with the License.
+ * * You may obtain a copy of the License at
+ * *
+ * *      http://www.apache.org/licenses/LICENSE-2.0
+ * *
+ * * Unless required by applicable law or agreed to in writing, software
+ * * distributed under the License is distributed on an "AS IS" BASIS,
+ * * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * * See the License for the specific language governing permissions and
+ * * limitations under the License.
+ * * #L%
  */
 
 package org.logicahealth.platform.api.controller;
@@ -44,14 +44,11 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.constraints.NotNull;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 @RestController
@@ -61,6 +58,8 @@ public class MultitenantSandboxController {
     private static final Logger logger = LoggerFactory.getLogger(MultitenantSandboxController.class);
 
     private SandboxService sandboxService;
+
+    public static final int INCREASED_BUFFER_SIZE = 6 * 1024;
 
     @Autowired
     public MultitenantSandboxController(SandboxService sandboxService) {
@@ -104,7 +103,8 @@ public class MultitenantSandboxController {
     @GetMapping(value = "/download", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     public void downloadSandbox(HttpServletRequest request, @PathVariable String teamId, final HttpServletResponse response) throws IOException {
         response.setContentType("application/zip");
-        response.setHeader("Content-Disposition","attachment;filename=sandbox.zip");
+        response.setHeader("Content-Disposition", "attachment;filename=sandbox.zip");
+        response.setBufferSize(INCREASED_BUFFER_SIZE);
         var dumpFileName = sandboxService.sandboxSchemaDump(sandboxService.get(teamId));
         var zipOutputStream = new ZipOutputStream(response.getOutputStream());
         sandboxService.writeZipFileToResponse(zipOutputStream, dumpFileName);
