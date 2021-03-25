@@ -105,9 +105,6 @@ public class MultitenantSandboxController {
     public void downloadSandbox(HttpServletRequest request, @PathVariable String teamId, final HttpServletResponse response) throws IOException {
         response.setContentType("application/zip");
         response.setHeader("Content-Disposition","attachment;filename=sandbox.zip");
-        if (!sandboxService.verifyUser(request, teamId)) {
-            throw new UnauthorizedUserException("User not authorized to download sandbox " + teamId);
-        }
         var dumpFileName = sandboxService.sandboxSchemaDump(sandboxService.get(teamId));
         var zipOutputStream = new ZipOutputStream(response.getOutputStream());
         sandboxService.writeZipFileToResponse(zipOutputStream, dumpFileName);
