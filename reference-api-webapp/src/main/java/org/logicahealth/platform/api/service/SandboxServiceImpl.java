@@ -282,7 +282,7 @@ public class SandboxServiceImpl implements SandboxService {
                 throw new RuntimeException();
             }
         } catch (InterruptedException | IOException e) {
-            logger.info("Error deleting " + dumpFileName);
+            logger.info("Error deleting " + dumpFileName, e);
             throw new RuntimeException();
         }
 
@@ -326,7 +326,7 @@ public class SandboxServiceImpl implements SandboxService {
             manifest.put(FHIR_VERSION, fhirContext.getVersion().getVersion().name());
             return new Gson().toJson(manifest);
         } catch (IOException | XmlPullParserException e) {
-            logger.error("Error while parsing pom file");
+            logger.error("Error while parsing pom file", e);
         }
         return null;
     }
