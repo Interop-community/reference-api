@@ -5,7 +5,7 @@ VOLUME /tmp
 
 ADD target/hspc-reference-api-webapp-*.jar app.jar
 
-ADD ../pom.xml /pom.xml
+ADD pom.xml /pom.xml
 
 RUN apt-get update -y && apt-get dist-upgrade -y
 
