@@ -59,7 +59,7 @@ public class MultitenantSandboxController {
 
     private SandboxService sandboxService;
 
-    public static final int INCREASED_BUFFER_SIZE = 6 * 1024;
+    public static final int INCREASED_BUFFER_SIZE = 50 * 1024;
 
     @Autowired
     public MultitenantSandboxController(SandboxService sandboxService) {
