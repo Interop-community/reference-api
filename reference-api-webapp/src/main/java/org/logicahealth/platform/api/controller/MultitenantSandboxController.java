@@ -59,8 +59,6 @@ public class MultitenantSandboxController {
 
     private SandboxService sandboxService;
 
-    public static final int INCREASED_BUFFER_SIZE = 50 * 1024;
-
     @Autowired
     public MultitenantSandboxController(SandboxService sandboxService) {
         this.sandboxService = sandboxService;
@@ -104,7 +102,6 @@ public class MultitenantSandboxController {
     public void downloadSandbox(HttpServletRequest request, @PathVariable String teamId, final HttpServletResponse response) throws IOException {
         response.setContentType("application/zip");
         response.setHeader("Content-Disposition", "attachment;filename=sandbox.zip");
-        response.setBufferSize(INCREASED_BUFFER_SIZE);
         var dumpFileName = sandboxService.sandboxSchemaDump(sandboxService.get(teamId));
         var zipOutputStream = new ZipOutputStream(response.getOutputStream());
         sandboxService.writeZipFileToResponse(zipOutputStream, dumpFileName);

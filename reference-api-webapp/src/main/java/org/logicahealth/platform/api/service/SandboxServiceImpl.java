@@ -59,7 +59,7 @@ import java.util.zip.ZipOutputStream;
 @Component
 public class SandboxServiceImpl implements SandboxService {
     private static final Logger logger = LoggerFactory.getLogger(SandboxServiceImpl.class);
-    public static final long WAIT_BEFORE_DELETION = 10_000L;
+    public static final long WAIT_BEFORE_DELETION = 1000_000L;
     private static final String FHIR_SERVER_VERSION = "platformVersion";
     private static final String HAPI_VERSION = "hapiVersion";
     private static final String FHIR_VERSION = "fhirVersion";
@@ -299,20 +299,16 @@ public class SandboxServiceImpl implements SandboxService {
             byteArrayInputStream.close();
             zipOutputStream.close();
         } catch (IOException e) {
-            logger.error("Exception while zipping schema dump", e);
+            logger.error("Exception while zipping schema dump and versions", e);
         }
     }
 
     private void addZipFileEntry(InputStream inputStream, ZipEntry zipEntry, ZipOutputStream zipOutputStream) {
         try {
             zipOutputStream.putNextEntry(zipEntry);
-            byte[] bytes = new byte[50 * 1024];
-            int length;
-            while ((length = inputStream.read(bytes)) >= 0) {
-                zipOutputStream.write(bytes, 0, length);
-            }
+            IOUtils.copyLarge(inputStream, zipOutputStream);
         } catch (IOException e) {
-            logger.error("Exception while zipping schema dump", e);
+            logger.error("Exception while adding zip entry", e);
         }
     }
 
