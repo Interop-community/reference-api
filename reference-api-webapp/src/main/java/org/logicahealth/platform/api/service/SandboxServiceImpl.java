@@ -306,7 +306,7 @@ public class SandboxServiceImpl implements SandboxService {
     private void addZipFileEntry(InputStream inputStream, ZipEntry zipEntry, ZipOutputStream zipOutputStream) {
         try {
             zipOutputStream.putNextEntry(zipEntry);
-            byte[] bytes = new byte[1024];
+            byte[] bytes = new byte[50 * 1024];
             int length;
             while ((length = inputStream.read(bytes)) >= 0) {
                 zipOutputStream.write(bytes, 0, length);
