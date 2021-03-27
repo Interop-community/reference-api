@@ -291,12 +291,12 @@ public class SandboxServiceImpl implements SandboxService {
     @Override
     public void writeZipFileToResponse(ZipOutputStream zipOutputStream, String dumpFileName) {
         try {
-            var fileInputStream = new FileInputStream(new File("./" + dumpFileName));
-            addZipFileEntry(fileInputStream, new ZipEntry("sandbox.sql"), zipOutputStream);
-            fileInputStream.close();
             var byteArrayInputStream = new ByteArrayInputStream(hapiAndSandboxVersions().getBytes());
             addZipFileEntry(byteArrayInputStream, new ZipEntry("versions.json"), zipOutputStream);
             byteArrayInputStream.close();
+            var fileInputStream = new FileInputStream(new File("./" + dumpFileName));
+            addZipFileEntry(fileInputStream, new ZipEntry("sandbox.sql"), zipOutputStream);
+            fileInputStream.close();
             zipOutputStream.close();
         } catch (IOException e) {
             logger.error("Exception while zipping schema dump and versions", e);
