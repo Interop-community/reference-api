@@ -6,21 +6,21 @@ hspc:
         clientSecret: secret
       fhir:
         datasource:
-          host: sandboxdb-test.logicahealth.org
+          host: sandboxdb-test.interop.community
           username: system
           password: ENC(H5tJdn4wTllfyqSkrkmzRNQNhwl7AZhB)
       sandboxManagerApi:
-        url: https://${SBMA_HOST:sandbox-api-test.logicahealth.org}
+        url: https://${SBMA_HOST:sandbox-api-test.interop.community}
         transactionPath: /analytics/transaction
     authorization:
-      url: https://auth-test.logicahealth.org
+      url: https://auth-test.interop.community
     messaging:
       pubsub:
         enabled: true
         forSandboxes: travisdstu2,PulmonaryEmbolismDSTU2,noman_dstu2,nomanstu3,nomandstu2
         subscription:
           channel:
-            endpoint: http://pubsub.logicahealth.org:9002/fhir-subscription/publish
+            endpoint: http://pubsub.interop.community:9002/fhir-subscription/publish
         includeSourceQueryParameter: true
 
 jasypt:

@@ -6,7 +6,7 @@ Welcome to the Logica Reference API!  The Logica Reference API server contains a
 
 *Note:* If you are wanting to build and test SMART on FHIR Apps, it is recommended that you use the free cloud-hosted version of the Logica Sandbox.
 
-[Logica Sandbox](https://sandbox.logicahealth.org)
+[Interop Community Sandbox](https://sandbox.interop.community)
 
 # Servers
 
