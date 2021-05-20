@@ -10,7 +10,7 @@ hspc:
           username: ${DB_USER:system}
           password: ${DB_PASSWORD:password}
       sandboxManagerApi:
-        url: https://${SBMA_HOST:sandbox-api.interop.community}
+        url: ${SBMA_HOST:https://sandbox-api.interop.community}
         transactionPath: /analytics/transaction
     authorization:
       url: ${AUTH_HOST:https://auth.interop.community}
