@@ -34,6 +34,7 @@ fi
 rm -rf target
 mkdir -p target
 cp ../reference-api-webapp/target/*.jar target
+cp ../pom.xml pom.xml
 
 docker \
   build -t $tag \
