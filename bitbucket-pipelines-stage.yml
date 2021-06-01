@@ -101,7 +101,7 @@ pipelines:
 
     # build docker image and push to nexus
     - export IMAGE_NAME=$(cat ci/container-definitions_dev.json | jq --raw-output '.[0].image')
-    - docker login -u $NEXUS_USR -p $NEXUS_PWD nexus.logicahealth.org:18083
+    - docker login -u $NEXUS_USR -p $NEXUS_PWD nexus.interop.community:18083
     - docker build -t $IMAGE_NAME .
     - docker push $IMAGE_NAME
     # register the ECS task definition and capture the version
@@ -158,14 +158,14 @@ pipelines:
         name: Deploy to test
         deployment: test
         script:
-          # maven test, build and deploy artifact to nexus.logicahealth.org/maven-snapshots
+          # maven test, build and deploy artifact to nexus.interop.community/maven-snapshots
           - mvn -V -B -s ci/settings.xml deploy
           # build dynamic container-definitions
           - export PROJECT_VERSION=$(mvn -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
           - sed -i -e "s/{{PROJECT_VERSION}}/$PROJECT_VERSION/g" ci/container-definitions_test.json
-          # build docker image and push to nexus.logicahealth.org:18083 (docker-hspcn)
+          # build docker image and push to nexus.interop.community:18083 (docker-hspcn)
           - export IMAGE_NAME=$(cat ci/container-definitions_test.json | jq --raw-output '.[0].image')
-          - docker login -u $NEXUS_USR -p $NEXUS_PWD nexus.logicahealth.org:18083
+          - docker login -u $NEXUS_USR -p $NEXUS_PWD nexus.interop.community:18083
           - docker build -t $IMAGE_NAME .
           - docker push $IMAGE_NAME
           # register the ECS task definition and capture the version
