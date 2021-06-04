@@ -312,7 +312,8 @@ public class SandboxServiceImpl implements SandboxService {
     }
 
     @Override
-    public void importSandboxSchema(File schemaFile, Sandbox sandbox) {
+    public void importSandboxSchema(File schemaFile, Sandbox sandbox, String hapiVersion) {
+        checkImportHapiVersionMatchesCurrent(hapiVersion);
         sandboxPersister.importSandboxSchema(schemaFile, sandbox);
     }
 
@@ -322,6 +323,22 @@ public class SandboxServiceImpl implements SandboxService {
             IOUtils.copyLarge(inputStream, zipOutputStream);
         } catch (IOException e) {
             logger.error("Exception while adding zip entry", e);
+            throw new RuntimeException();
+        }
+    }
+
+    private void checkImportHapiVersionMatchesCurrent(String importHapiVersion) {
+        MavenXpp3Reader reader = new MavenXpp3Reader();
+        try {
+            Model model = reader.read(new FileReader("pom.xml"));
+            var currentHapiVersion = model.getProperties().get("hapi.version").toString();
+            if (!importHapiVersion.equals(currentHapiVersion)) {
+                var error = "Imported file hapi version " + importHapiVersion + " does not match current hapi version " + currentHapiVersion;
+                logger.error(error);
+                throw new RuntimeException(error);
+            }
+        } catch (IOException | XmlPullParserException e) {
+            logger.error("Error while parsing pom file", e);
             throw new RuntimeException();
         }
     }

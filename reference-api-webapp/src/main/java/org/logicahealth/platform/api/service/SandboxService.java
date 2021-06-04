@@ -54,6 +54,6 @@ public interface SandboxService {
 
     void writeZipFileToResponse(ZipOutputStream zipOutputStream, String dumpFileName);
 
-    void importSandboxSchema(File schemaFile, Sandbox sandbox);
+    void importSandboxSchema(File schemaFile, Sandbox sandbox, String hapiVersion);
 
 }

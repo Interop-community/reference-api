@@ -303,7 +303,7 @@ public class SandboxPersister {
     public void dumpSandboxSchema(Sandbox sandbox, String sandboxDumpFilename) {
         String sandboxSchemaName = toSchemaName.apply(sandbox);
         try {
-            String dump = "mysqldump -h " + dbhost + " -u " + dbusername + " -p'" + dbpassword + "' " + sandboxSchemaName + " > ./" + sandboxDumpFilename;
+            String dump = "mysqldump -h " + dbhost + " -u " + dbusername + " -p'" + dbpassword + "' --hex-blob " + sandboxSchemaName + " > ./" + sandboxDumpFilename;
             String[] cmdarray = {"/bin/sh", "-c", dump};
             Process pr = Runtime.getRuntime().exec(cmdarray);
             Integer outcome = pr.waitFor();

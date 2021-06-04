@@ -29,6 +29,7 @@ import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.Validate;
+import org.logicahealth.platform.api.DatabaseProperties;
 import org.logicahealth.platform.api.model.DataSet;
 import org.logicahealth.platform.api.model.ResetSandboxCommand;
 import org.logicahealth.platform.api.model.Sandbox;
@@ -110,10 +111,10 @@ public class MultitenantSandboxController {
         response.flushBuffer();
     }
 
-    @PostMapping(value = "/import/{sandboxId}")
+    @PostMapping(value = "/import/{sandboxId}/{hapiVersion}")
     @ResponseStatus(HttpStatus.CREATED)
     @Consumes("multipart/form-data")
-    public void importSandboxSchema(HttpServletRequest request, @RequestParam("schema") MultipartFile multipartFile, @PathVariable("sandboxId") String sandboxId) {
+    public void importSandboxSchema(HttpServletRequest request, @RequestParam("schema") MultipartFile multipartFile, @PathVariable("sandboxId") String sandboxId, @PathVariable("hapiVersion") String hapiVersion) {
         if (!sandboxService.verifyUser(request, sandboxId)) {
             throw new UnauthorizedUserException("User not authorized to import sandbox " + sandboxId);
         }
@@ -122,8 +123,8 @@ public class MultitenantSandboxController {
 
             FileUtils.copyInputStreamToFile(multipartFile.getInputStream(), schemaFile);
             var sandbox = new Sandbox(sandboxId);
-            sandbox.setSchemaVersion("9");
-            sandboxService.importSandboxSchema(schemaFile, sandbox);
+            sandbox.setSchemaVersion(DatabaseProperties.DEFAULT_HSPC_SCHEMA_VERSION);
+            sandboxService.importSandboxSchema(schemaFile, sandbox, hapiVersion);
             sandboxService.deleteSchemaDump(schemaFile.getName());
         } catch (IOException e) {
             throw new RuntimeException("Exception while creating schema file for sandbox " + sandboxId);
