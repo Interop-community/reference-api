@@ -412,13 +412,13 @@ public class SandboxPersister {
 
     public void importSandboxSchema(File schemaFile, Sandbox sandbox) {
         String sandboxSchemaName = toSchemaName.apply(sandbox);
-        var mySqlCommandPrefix = "mysql -u " + dbusername + " -p" + dbpassword;
-        var createAndUseSchema = mySqlCommandPrefix + " -e 'CREATE DATABASE  IF NOT EXISTS `" + sandboxSchemaName + "`;'";
+        var mySqlCommandPrefix = "mysqladmin -h " + dbhost + " -u " + dbusername + " -p" + dbpassword;
+        var createAndUseSchema = mySqlCommandPrefix + " CREATE " + sandboxSchemaName + ";";
         runSqlString(createAndUseSchema);
         var tempFileName = "temp" + UUID.randomUUID() + ".sql";
         var insertUseStatement = "(echo \"USE \\`" + sandboxSchemaName + "\\`; \" && cat " + schemaFile + ") > " + tempFileName + " && mv " + tempFileName + " " + schemaFile;
         runSqlString(insertUseStatement);
-        var createSchemaContents = mySqlCommandPrefix + " " + " < " + schemaFile.getAbsolutePath();
+        var createSchemaContents = "mysql -h " + dbhost + " -u " + dbusername + " -p" + dbpassword + " < " + schemaFile.getAbsolutePath();
         runSqlString(createSchemaContents);
     }
 

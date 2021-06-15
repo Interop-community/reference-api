@@ -115,9 +115,6 @@ public class MultitenantSandboxController {
     @ResponseStatus(HttpStatus.CREATED)
     @Consumes("multipart/form-data")
     public void importSandboxSchema(HttpServletRequest request, @RequestParam("schema") MultipartFile multipartFile, @PathVariable("sandboxId") String sandboxId, @PathVariable("hapiVersion") String hapiVersion) {
-        if (!sandboxService.verifyUser(request, sandboxId)) {
-            throw new UnauthorizedUserException("User not authorized to import sandbox " + sandboxId);
-        }
         var schemaFile = new File(sandboxId + UUID.randomUUID() + ".sql");
         try {
 
