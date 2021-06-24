@@ -57,6 +57,7 @@ hspc:
         url: http://${SBMA_HOST:localhost}:${SBMA_PORT:12000}
         transactionPath: /analytics/transaction
         userAuthPath: /user/authorize
+        exportImportAuthPath: /user/authorizeExportImport
       fhir:
         datasource:
           schemaPrefix: hspc_8_

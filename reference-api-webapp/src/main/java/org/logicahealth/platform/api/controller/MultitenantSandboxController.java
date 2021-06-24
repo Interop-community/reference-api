@@ -100,8 +100,11 @@ public class MultitenantSandboxController {
         return newSandbox;
     }
 
-    @GetMapping(value = "/download", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    public void downloadSandbox(HttpServletRequest request, @PathVariable String teamId, final HttpServletResponse response) throws IOException {
+    @GetMapping(value = "/download/{teamId}", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public void downloadSandbox(HttpServletRequest request, @PathVariable("teamId") String teamId, final HttpServletResponse response) throws IOException {
+        if (!sandboxService.verifyUserCanExportImport(request, teamId)) {
+            throw new UnauthorizedUserException("User not authorized to export sandbox " + teamId);
+        }
         response.setContentType("application/zip");
         response.setHeader("Content-Disposition", "attachment;filename=sandbox.zip");
         var dumpFileName = sandboxService.sandboxSchemaDump(sandboxService.get(teamId));
@@ -111,20 +114,23 @@ public class MultitenantSandboxController {
         response.flushBuffer();
     }
 
-    @PostMapping(value = "/import/{sandboxId}/{hapiVersion}")
+    @PostMapping(value = "/import/{teamId}/{hapiVersion}")
     @ResponseStatus(HttpStatus.CREATED)
     @Consumes("multipart/form-data")
-    public void importSandboxSchema(HttpServletRequest request, @RequestParam("schema") MultipartFile multipartFile, @PathVariable("sandboxId") String sandboxId, @PathVariable("hapiVersion") String hapiVersion) {
-        var schemaFile = new File(sandboxId + UUID.randomUUID() + ".sql");
+    public void importSandboxSchema(HttpServletRequest request, @RequestParam("schema") MultipartFile multipartFile, @PathVariable("teamId") String teamId, @PathVariable("hapiVersion") String hapiVersion) {
+        if (!sandboxService.verifyUserCanExportImport(request, teamId)) {
+            throw new UnauthorizedUserException("User not authorized to import sandbox " + teamId);
+        }
+        var schemaFile = new File(teamId + UUID.randomUUID() + ".sql");
         try {
 
             FileUtils.copyInputStreamToFile(multipartFile.getInputStream(), schemaFile);
-            var sandbox = new Sandbox(sandboxId);
+            var sandbox = new Sandbox(teamId);
             sandbox.setSchemaVersion(DatabaseProperties.DEFAULT_HSPC_SCHEMA_VERSION);
             sandboxService.importSandboxSchema(schemaFile, sandbox, hapiVersion);
             sandboxService.deleteSchemaDump(schemaFile.getName());
         } catch (IOException e) {
-            throw new RuntimeException("Exception while creating schema file for sandbox " + sandboxId);
+            throw new RuntimeException("Exception while creating schema file for sandbox " + teamId);
         }
     }
 

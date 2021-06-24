@@ -74,6 +74,9 @@ public class SandboxServiceImpl implements SandboxService {
     @Value("${hspc.platform.api.sandboxManagerApi.userAuthPath}")
     private String userAuthPath;
 
+    @Value("${hspc.platform.api.sandboxManagerApi.exportImportAuthPath}")
+    private String exportImportAuthPath;
+
     private SandboxPersister sandboxPersister;
 
     private TenantInfoRequestMatcher tenantInfoRequestMatcher;
@@ -247,6 +250,15 @@ public class SandboxServiceImpl implements SandboxService {
 
     @Override
     public boolean verifyUser(HttpServletRequest request, String sandboxId) {
+        return verifyUserPermissions( request, sandboxId, this.userAuthPath);
+    }
+
+    @Override
+    public boolean verifyUserCanExportImport(HttpServletRequest request, String sandboxId) {
+        return verifyUserPermissions( request,  sandboxId,  this.exportImportAuthPath);
+    }
+
+    private boolean verifyUserPermissions(HttpServletRequest request, String sandboxId, String activity) {
         String authToken = getBearerToken(request);
         if (authToken == null) {
             return false;
@@ -259,12 +271,11 @@ public class SandboxServiceImpl implements SandboxService {
 
         HttpEntity entity = new HttpEntity(jsonBody, headers);
         try {
-            ResponseEntity<String> response = restTemplate.exchange(this.sandboxManagerApiUrl + this.userAuthPath, HttpMethod.POST, entity, String.class);
+            ResponseEntity<String> response = restTemplate.exchange(this.sandboxManagerApiUrl + activity, HttpMethod.POST, entity, String.class);
             return true;
         } catch (HttpClientErrorException e) {
             return false;
         }
-
     }
 
     @Override

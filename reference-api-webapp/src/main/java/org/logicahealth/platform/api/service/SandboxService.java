@@ -50,6 +50,8 @@ public interface SandboxService {
 
     boolean verifyUser(HttpServletRequest request, String sandboxId);
 
+    boolean verifyUserCanExportImport(HttpServletRequest request, String sandboxId);
+
     void deleteSchemaDump(String dumpFileName);
 
     void writeZipFileToResponse(ZipOutputStream zipOutputStream, String dumpFileName);
