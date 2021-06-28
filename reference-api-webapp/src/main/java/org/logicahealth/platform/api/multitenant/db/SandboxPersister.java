@@ -1,21 +1,21 @@
 /**
- *  * #%L
- *  *
- *  * %%
- *  * Copyright (C) 2014-2020 Healthcare Services Platform Consortium
- *  * %%
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  *      http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
- *  * #L%
+ * * #%L
+ * *
+ * * %%
+ * * Copyright (C) 2014-2020 Healthcare Services Platform Consortium
+ * * %%
+ * * Licensed under the Apache License, Version 2.0 (the "License");
+ * * you may not use this file except in compliance with the License.
+ * * You may obtain a copy of the License at
+ * *
+ * *      http://www.apache.org/licenses/LICENSE-2.0
+ * *
+ * * Unless required by applicable law or agreed to in writing, software
+ * * distributed under the License is distributed on an "AS IS" BASIS,
+ * * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * * See the License for the specific language governing permissions and
+ * * limitations under the License.
+ * * #L%
  */
 
 package org.logicahealth.platform.api.multitenant.db;
@@ -40,6 +40,7 @@ import java.io.*;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -147,7 +148,7 @@ public class SandboxPersister {
         return sandbox;
     };
 
-    Function<String, Sandbox> toSandboxWithTenantName = (tenantName) ->  {
+    Function<String, Sandbox> toSandboxWithTenantName = (tenantName) -> {
         try {
             tenantName = tenantName.split(DatabaseProperties.SANDBOX_SCHEMA_DELIMITER)[2];
             return findSandbox(tenantName);
@@ -247,7 +248,7 @@ public class SandboxPersister {
 
         try {
             String dump = "mysqldump -h " + dbhost + " -u " + dbusername + " -p'" + dbpassword + "' " + schemaNameClonedSandbox + " > ./temp.sql";
-            String[] cmdarray = {"/bin/sh","-c", dump};
+            String[] cmdarray = {"/bin/sh", "-c", dump};
             Process pr = Runtime.getRuntime().exec(cmdarray);
             Integer outcome = pr.waitFor();
             BufferedReader in = new BufferedReader(new InputStreamReader(pr.getErrorStream()));
@@ -255,7 +256,7 @@ public class SandboxPersister {
             if (outcome == 0) {
                 logger.info("Mysql dump successful.");
                 String create = "mysqladmin -h " + dbhost + " -u " + dbusername + " -p'" + dbpassword + "' create " + schemaNameNewSandbox;
-                String[] cmdarray2 = {"/bin/sh","-c", create};
+                String[] cmdarray2 = {"/bin/sh", "-c", create};
                 Process pr2 = Runtime.getRuntime().exec(cmdarray2);
                 Integer outcome2 = pr2.waitFor();
                 BufferedReader in2 = new BufferedReader(new InputStreamReader(pr2.getErrorStream()));
@@ -263,7 +264,7 @@ public class SandboxPersister {
                 if (outcome2 == 0) {
                     logger.info("New schema created.");
                     String clone = "mysql -h " + dbhost + " -u " + dbusername + " -p'" + dbpassword + "' " + schemaNameNewSandbox + " < ./temp.sql";
-                    String[] cmdarray3 = {"/bin/sh","-c", clone};
+                    String[] cmdarray3 = {"/bin/sh", "-c", clone};
                     Process pr3 = Runtime.getRuntime().exec(cmdarray3);
                     Integer outcome3 = pr3.waitFor();
                     BufferedReader in3 = new BufferedReader(new InputStreamReader(pr3.getErrorStream()));
@@ -271,7 +272,7 @@ public class SandboxPersister {
                     if (outcome3 == 0) {
                         logger.info("Data loaded into new schema.");
                         String delete = "rm ./temp.sql";
-                        String[] cmdarray4 = {"/bin/sh","-c", delete};
+                        String[] cmdarray4 = {"/bin/sh", "-c", delete};
                         Process pr4 = Runtime.getRuntime().exec(cmdarray4);
                         Integer outcome4 = pr4.waitFor();
                         BufferedReader in4 = new BufferedReader(new InputStreamReader(pr4.getErrorStream()));
@@ -302,8 +303,8 @@ public class SandboxPersister {
     public void dumpSandboxSchema(Sandbox sandbox, String sandboxDumpFilename) {
         String sandboxSchemaName = toSchemaName.apply(sandbox);
         try {
-            String dump = "mysqldump -h " + dbhost + " -u " + dbusername + " -p'" + dbpassword + "' " + sandboxSchemaName + " > ./" + sandboxDumpFilename;
-            String[] cmdarray = {"/bin/sh","-c", dump};
+            String dump = "mysqldump -h " + dbhost + " -u " + dbusername + " -p'" + dbpassword + "' --hex-blob " + sandboxSchemaName + " > ./" + sandboxDumpFilename;
+            String[] cmdarray = {"/bin/sh", "-c", dump};
             Process pr = Runtime.getRuntime().exec(cmdarray);
             Integer outcome = pr.waitFor();
             BufferedReader in = new BufferedReader(new InputStreamReader(pr.getErrorStream()));
@@ -409,5 +410,35 @@ public class SandboxPersister {
         throw new IllegalArgumentException("No valid FHIR version profile is set.");
     }
 
+    public void importSandboxSchema(File schemaFile, Sandbox sandbox) {
+        String sandboxSchemaName = toSchemaName.apply(sandbox);
+        var mySqlCommandPrefix = "mysqladmin -h " + dbhost + " -u " + dbusername + " -p" + dbpassword;
+        var createAndUseSchema = mySqlCommandPrefix + " CREATE " + sandboxSchemaName + ";";
+        runSqlString(createAndUseSchema);
+        var tempFileName = "temp" + UUID.randomUUID() + ".sql";
+        var insertUseStatement = "(echo \"USE \\`" + sandboxSchemaName + "\\`; \" && cat " + schemaFile + ") > " + tempFileName + " && mv " + tempFileName + " " + schemaFile;
+        runSqlString(insertUseStatement);
+        var createSchemaContents = "mysql -h " + dbhost + " -u " + dbusername + " -p" + dbpassword + " < " + schemaFile.getAbsolutePath();
+        runSqlString(createSchemaContents);
+    }
+
+    private void runSqlString(String sqlString) {
+        try {
+            String[] cmdarray = {"/bin/sh", "-c", sqlString};
+            Process pr = Runtime.getRuntime().exec(cmdarray);
+            Integer outcome = pr.waitFor();
+            BufferedReader in = new BufferedReader(new InputStreamReader(pr.getErrorStream()));
+            String error = IOUtils.toString(in);
+            if (outcome == 0) {
+                logger.info("Mysql sql run was successful.");
+            } else {
+                throw new Exception(error);
+            }
+        } catch (Exception e) {
+            logger.info("Error in running sql string", e);
+            throw new RuntimeException(e);
+        }
+
+    }
 }
 

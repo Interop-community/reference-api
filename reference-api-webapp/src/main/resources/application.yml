@@ -6,18 +6,20 @@ server:
     protocol_header: x-forwarded-proto
     maxswallowsize:
       inmb: -1
+    max-http-post-size: 128MB
 
 spring:
   application:
-    name: HSPC Reference API
+    name: Interop Community Reference API
   profiles:
     active: multitenant,dstu2
   main:
     allow-bean-definition-overriding: true
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+      max-file-size: 128MB
+      max-request-size: 128MB
+      enabled: true
   batch:
     job:
       enabled: false
@@ -43,8 +45,8 @@ hspc:
       security:
         # determines if security is applied at the contextPath
         mode: secured
-#        mode: mock
-#        mode: open
+      #        mode: mock
+      #        mode: open
       oauth2:
         clientId: hspc_resource_server
         clientSecret: secret
@@ -55,11 +57,12 @@ hspc:
         url: http://${SBMA_HOST:localhost}:${SBMA_PORT:12000}
         transactionPath: /analytics/transaction
         userAuthPath: /user/authorize
+        exportImportAuthPath: /user/authorizeExportImport
       fhir:
         datasource:
           schemaPrefix: hspc_8_
           schema: hspc_8_${hspc.platform.api.sandbox.name}
-#          driverClassName: com.mysql.cj.jdbc.Driver
+          #          driverClassName: com.mysql.cj.jdbc.Driver
           host: ${DB_HOST:localhost}
           url: jdbc:mysql://${hspc.platform.api.fhir.datasource.host}:${DB_PORT:3306}
           username: ${DB_USER:root}
@@ -67,7 +70,7 @@ hspc:
           emptySchemaScriptPattern: db/mysql/hspc_%s_schema_empty.sql
           starterSchemaScriptPattern: db/mysql/hspc_%s_%s_%s_dataset.sql
           # Comma-separated list of scripts to run in order
-#          initializationScripts: db/mysql/V1__convert_hapi_3.2.0_to_3.3.0.sql
+          #          initializationScripts: db/mysql/V1__convert_hapi_3.2.0_to_3.3.0.sql
           minimumIdle: 2
           maximumPoolSize: 10
           idleTimeout: 30000
@@ -81,7 +84,7 @@ hspc:
           dialect: org.hibernate.dialect.MySQL5Dialect
         terminology:
           proxy:
-            host: api-v8-stu3.logicahealth.org/${hspc.platform.api.sandbox.name}   # api.logicahealth.org/${hspc.platform.api.sandbox.name}
+            host: api-v8-stu3.interop.community/${hspc.platform.api.sandbox.name}   # api.interop.community/${hspc.platform.api.sandbox.name}
             contextPath: /open
         contextPath: data
         # remove openContextPath to disable the open endpoint

@@ -6,58 +6,23 @@ hspc:
         clientSecret: secret
       fhir:
         datasource:
-          host: sandboxdb.logicahealth.org
+          host: sandboxdb.interop.community
           username: system
-          password: ENC(PN5w0Ds+k3I2vOVS/dZM/N9HaIFZgGIX)
+          password: ENC(eu7PppbSk0mHHUZjmjzZxPeU8X9aCckJ)
       sandboxManagerApi:
-        url: https://${SBMA_HOST:sandbox-api.logicahealth.org}
+        url: https://${SBMA_HOST:sandbox-api.interop.community}
         transactionPath: /analytics/transaction
     authorization:
-      url: https://auth.logicahealth.org
+      url: https://auth.interop.community
     messaging:
       pubsub:
         enabled: true
         forSandboxes: travisdstu2,PulmonaryEmbolismDSTU2,noman_dstu2,nomanstu3,nomandstu2,PulmonaryEmbolism2,PulmonaryEmbolismVer
         subscription:
           channel:
-            endpoint: http://pubsub.logicahealth.org:9002/fhir-subscription/publish
+            endpoint: http://pubsub.interop.community:9002/fhir-subscription/publish
         includeSourceQueryParameter: true
 
 jasypt:
   encryptor:
     algorithm: PBEWithMD5AndTripleDES
-
----
-
-spring:
-  profiles: dstu2
-
-hspc:
-  platform:
-    api:
-      fhir:
-        hibernate:
-          indexSourceUrl: https://content.logicahealth.org/datasets/reference-api/hspc_5/indexes_hspc_5_dstu2.tar.gz
-
-hibernate:
-  search:
-    default:
-      indexBase: /var/indexes/@artifact.name@/dstu2
-
----
-
-spring:
-  profiles: stu3
-
-hspc:
-  platform:
-    api:
-      fhir:
-        hibernate:
-          indexSourceUrl: https://content.logicahealth.org/datasets/reference-api/hspc_5/indexes_hspc_5_stu3.tar.gz
-
-hibernate:
-  search:
-    default:
-      indexBase: /var/indexes/@artifact.name@/stu3
-

@@ -2,7 +2,7 @@
   <mirrors>
     <mirror>
       <id>hspc-nexus</id>
-      <name>HSPC Nexus</name>
+      <name>Interop Nexus</name>
       <mirrorOf>*</mirrorOf>
       <url>https://nexus.logicahealth.org/repository/maven-all/</url>
     </mirror>
@@ -23,7 +23,7 @@
       </properties>
       <repositories>
         <repository>
-          <name>HSPC Releases</name>
+          <name>Interop Releases</name>
           <id>hspc-releases</id>
           <url>https://nexus.logicahealth.org/repository/maven-releases/</url>
           <releases>
@@ -34,7 +34,7 @@
           </snapshots>
         </repository>
         <repository>
-          <name>HSPC Snapshots</name>
+          <name>Interop Snapshots</name>
           <id>hspc-snapshots</id>
           <url>https://nexus.logicahealth.org/repository/maven-snapshots/</url>
           <releases>
