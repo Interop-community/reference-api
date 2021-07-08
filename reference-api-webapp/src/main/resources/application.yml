@@ -207,5 +207,5 @@ smart-configuration-metadata:
   management_endpoint: ${hspc.platform.authorization.url}/manage
   introspection_endpoint: ${hspc.platform.authorization.url}/introspect
   revocation_endpoint: ${hspc.platform.authorization.url}/revoke
-  capabilities: ["launch-ehr", "client-public", "client-confidential-symmetric", "context-ehr-patient", "sso-openid-connect", "launch-standalone"]
+  capabilities: ["launch-ehr", "client-public", "client-confidential-symmetric", "context-ehr-patient", "sso-openid-connect", "launch-standalone", "context-banner", "context-style", "context-standalone-patient", "permission-offline", "permission-patient", "permission-user"]
 
