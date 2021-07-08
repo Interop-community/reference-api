@@ -25,7 +25,9 @@ import org.logicahealth.platform.api.model.Sandbox;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotNull;
+import java.io.File;
 import java.util.Collection;
+import java.util.zip.ZipOutputStream;
 
 public interface SandboxService {
     void reset();
@@ -38,6 +40,8 @@ public interface SandboxService {
 
     void clone(@NotNull Sandbox newSandbox, @NotNull Sandbox clonedSandbox);
 
+    String sandboxSchemaDump(@NotNull Sandbox sandbox);
+
     Sandbox get(String teamId);
 
     boolean remove(String teamId);
@@ -45,5 +49,13 @@ public interface SandboxService {
     Sandbox reset(String teamId, DataSet dataSet);
 
     boolean verifyUser(HttpServletRequest request, String sandboxId);
+
+    boolean verifyUserCanExportImport(HttpServletRequest request, String sandboxId);
+
+    void deleteSchemaDump(String dumpFileName);
+
+    void writeZipFileToResponse(ZipOutputStream zipOutputStream, String dumpFileName);
+
+    void importSandboxSchema(File schemaFile, Sandbox sandbox, String hapiVersion);
 
 }

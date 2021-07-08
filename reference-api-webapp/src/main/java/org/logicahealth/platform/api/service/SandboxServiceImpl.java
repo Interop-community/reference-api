@@ -1,26 +1,33 @@
 /**
- *  * #%L
- *  *
- *  * %%
- *  * Copyright (C) 2014-2020 Healthcare Services Platform Consortium
- *  * %%
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  *      http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
- *  * #L%
+ * * #%L
+ * *
+ * * %%
+ * * Copyright (C) 2014-2020 Healthcare Services Platform Consortium
+ * * %%
+ * * Licensed under the Apache License, Version 2.0 (the "License");
+ * * you may not use this file except in compliance with the License.
+ * * You may obtain a copy of the License at
+ * *
+ * *      http://www.apache.org/licenses/LICENSE-2.0
+ * *
+ * * Unless required by applicable law or agreed to in writing, software
+ * * distributed under the License is distributed on an "AS IS" BASIS,
+ * * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * * See the License for the specific language governing permissions and
+ * * limitations under the License.
+ * * #L%
  */
 
 package org.logicahealth.platform.api.service;
 
+import ca.uhn.fhir.context.FhirContext;
+import com.google.gson.Gson;
+import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.logicahealth.platform.api.DatabaseProperties;
 import org.logicahealth.platform.api.model.DataSet;
 import org.logicahealth.platform.api.model.Sandbox;
@@ -35,17 +42,31 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotNull;
+import java.io.*;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Component
 public class SandboxServiceImpl implements SandboxService {
     private static final Logger logger = LoggerFactory.getLogger(SandboxServiceImpl.class);
+    public static final long WAIT_BEFORE_DELETION = 1000_000L;
+    private static final String FHIR_SERVER_VERSION = "platformVersion";
+    private static final String HAPI_VERSION = "hapiVersion";
+    private static final String FHIR_VERSION = "fhirVersion";
 
     @Value("${hspc.platform.api.sandboxManagerApi.url}")
     private String sandboxManagerApiUrl;
@@ -53,11 +74,18 @@ public class SandboxServiceImpl implements SandboxService {
     @Value("${hspc.platform.api.sandboxManagerApi.userAuthPath}")
     private String userAuthPath;
 
+    @Value("${hspc.platform.api.sandboxManagerApi.exportImportAuthPath}")
+    private String exportImportAuthPath;
+
     private SandboxPersister sandboxPersister;
 
     private TenantInfoRequestMatcher tenantInfoRequestMatcher;
 
     private RestTemplate restTemplate;
+
+    @Autowired
+    @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
+    private FhirContext fhirContext;
 
     @Autowired
     public SandboxServiceImpl(SandboxPersister sandboxPersister, TenantInfoRequestMatcher tenantInfoRequestMatcher,
@@ -150,6 +178,14 @@ public class SandboxServiceImpl implements SandboxService {
     }
 
     @Override
+    public String sandboxSchemaDump(@NotNull Sandbox sandbox) {
+        var sandboxDumpFilename = "dump" + sandbox.getTeamId() + UUID.randomUUID() + ".sql";
+        logger.info("Dumping schema for sandbox " + sandbox.getTeamId() + " into " + sandboxDumpFilename);
+        sandboxPersister.dumpSandboxSchema(sandbox, sandboxDumpFilename);
+        return sandboxDumpFilename;
+    }
+
+    @Override
     public Sandbox get(String teamId) {
         Sandbox sandbox;
         try {
@@ -214,6 +250,15 @@ public class SandboxServiceImpl implements SandboxService {
 
     @Override
     public boolean verifyUser(HttpServletRequest request, String sandboxId) {
+        return verifyUserPermissions( request, sandboxId, this.userAuthPath);
+    }
+
+    @Override
+    public boolean verifyUserCanExportImport(HttpServletRequest request, String sandboxId) {
+        return verifyUserPermissions( request,  sandboxId,  this.exportImportAuthPath);
+    }
+
+    private boolean verifyUserPermissions(HttpServletRequest request, String sandboxId, String activity) {
         String authToken = getBearerToken(request);
         if (authToken == null) {
             return false;
@@ -222,16 +267,126 @@ public class SandboxServiceImpl implements SandboxService {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "BEARER " + authToken);
 
-        String jsonBody = "{\"sandbox\": \""+ sandboxId + "\"}";
+        String jsonBody = "{\"sandbox\": \"" + sandboxId + "\"}";
 
         HttpEntity entity = new HttpEntity(jsonBody, headers);
         try {
-            ResponseEntity<String> response = restTemplate.exchange(this.sandboxManagerApiUrl + this.userAuthPath, HttpMethod.POST, entity, String.class);
+            ResponseEntity<String> response = restTemplate.exchange(this.sandboxManagerApiUrl + activity, HttpMethod.POST, entity, String.class);
             return true;
         } catch (HttpClientErrorException e) {
             return false;
         }
+    }
 
+    @Override
+    @Async("taskExecutor")
+    @Retryable
+    public void deleteSchemaDump(String dumpFileName) {
+        try {
+            Thread.sleep(WAIT_BEFORE_DELETION);
+            String delete = "rm ./" + dumpFileName;
+            String[] cmdarray = {"/bin/sh", "-c", delete};
+            Process pr = Runtime.getRuntime().exec(cmdarray);
+            Integer outcome4 = pr.waitFor();
+            BufferedReader in = new BufferedReader(new InputStreamReader(pr.getErrorStream()));
+            var error = IOUtils.toString(in);
+            if (outcome4 == 0) {
+                logger.info(dumpFileName + " file deleted.");
+            } else {
+                logger.info("Error deleting " + dumpFileName);
+                throw new RuntimeException();
+            }
+        } catch (InterruptedException | IOException e) {
+            logger.info("Error deleting " + dumpFileName, e);
+            throw new RuntimeException();
+        }
+
+    }
+
+    @Override
+    public void writeZipFileToResponse(ZipOutputStream zipOutputStream, String dumpFileName) {
+        try {
+            var byteArrayInputStream = new ByteArrayInputStream(hapiAndSandboxVersions().getBytes());
+            addZipFileEntry(byteArrayInputStream, new ZipEntry("versions.json"), zipOutputStream);
+            byteArrayInputStream.close();
+            byteArrayInputStream = new ByteArrayInputStream(getSHA256Hash(dumpFileName).getBytes());
+            addZipFileEntry(byteArrayInputStream, new ZipEntry("hash"), zipOutputStream);
+            byteArrayInputStream.close();
+            var fileInputStream = new FileInputStream(new File("./" + dumpFileName));
+            addZipFileEntry(fileInputStream, new ZipEntry("sandbox.sql"), zipOutputStream);
+            fileInputStream.close();
+            zipOutputStream.close();
+        } catch (IOException e) {
+            logger.error("Exception while zipping schema dump and versions", e);
+            throw new RuntimeException();
+        }
+    }
+
+    @Override
+    public void importSandboxSchema(File schemaFile, Sandbox sandbox, String hapiVersion) {
+        checkImportHapiVersionMatchesCurrent(hapiVersion);
+        sandboxPersister.importSandboxSchema(schemaFile, sandbox);
+    }
+
+    private void addZipFileEntry(InputStream inputStream, ZipEntry zipEntry, ZipOutputStream zipOutputStream) {
+        try {
+            zipOutputStream.putNextEntry(zipEntry);
+            IOUtils.copyLarge(inputStream, zipOutputStream);
+        } catch (IOException e) {
+            logger.error("Exception while adding zip entry", e);
+            throw new RuntimeException();
+        }
+    }
+
+    private void checkImportHapiVersionMatchesCurrent(String importHapiVersion) {
+        MavenXpp3Reader reader = new MavenXpp3Reader();
+        try {
+            Model model = reader.read(new FileReader("pom.xml"));
+            var currentHapiVersion = model.getProperties().get("hapi.version").toString();
+            if (!importHapiVersion.equals(currentHapiVersion)) {
+                var error = "Imported file hapi version " + importHapiVersion + " does not match current hapi version " + currentHapiVersion;
+                logger.error(error);
+                throw new RuntimeException(error);
+            }
+        } catch (IOException | XmlPullParserException e) {
+            logger.error("Error while parsing pom file", e);
+            throw new RuntimeException();
+        }
+    }
+
+    private String hapiAndSandboxVersions() {
+        MavenXpp3Reader reader = new MavenXpp3Reader();
+        try {
+            Model model = reader.read(new FileReader("pom.xml"));
+            var manifest = new HashMap<String, String>();
+            manifest.put(FHIR_SERVER_VERSION, model.getVersion());
+            manifest.put(HAPI_VERSION, model.getProperties().get("hapi.version").toString());
+            manifest.put(FHIR_VERSION, fhirContext.getVersion().getVersion().name());
+            return new Gson().toJson(manifest);
+        } catch (IOException | XmlPullParserException e) {
+            logger.error("Error while parsing pom file", e);
+            throw new RuntimeException();
+        }
+    }
+
+    private String getSHA256Hash(String dumpFileName) {
+        MessageDigest messageDigest;
+        try {
+            messageDigest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            logger.error("Exception while hashing schema dump", e);
+            throw new RuntimeException();
+        }
+        try (
+                var bufferedInputStream = new BufferedInputStream(new FileInputStream(new File("./" + dumpFileName)));
+                var digestInputStream = new DigestInputStream(bufferedInputStream, messageDigest)
+        ) {
+            while (digestInputStream.read() != -1) ;
+            return Hex.encodeHexString(messageDigest.digest());
+        } catch (IOException e) {
+            logger.error("Exception while hashing schema dump", e);
+            throw new RuntimeException();
+        }
     }
 
     private String getBearerToken(HttpServletRequest request) {
@@ -242,6 +397,5 @@ public class SandboxServiceImpl implements SandboxService {
         }
         return authToken.substring(7);
     }
-
 
 }
