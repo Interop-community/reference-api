@@ -1,17 +1,17 @@
-# Logica Reference API Parent
+# Meld Reference API Parent
 
-Welcome to the Logica Reference API!  The Logica Reference API server contains a FHIR resource server.  The project is a composition of servers and libraries that are available in this repository.
+Welcome to the Meld Reference API!  The Meld Reference API server contains a FHIR resource server.  The project is a composition of servers and libraries that are available in this repository.
 
-# Logica Sandbox
+# Meld Sandbox
 
-*Note:* If you are wanting to build and test SMART on FHIR Apps, it is recommended that you use the free cloud-hosted version of the Logica Sandbox.
+*Note:* If you are wanting to build and test SMART on FHIR Apps, it is recommended that you use the free cloud-hosted version of the Meld Sandbox.
 
 [Interop Community Sandbox](https://sandbox.interop.community)
 
 # Servers
 
 ## reference-api-webapp
-A deployable multitenant web application.  The reference-api-webapp may be used as an example for a custom Logica FHIR Resource server.
+A deployable multitenant web application.  The reference-api-webapp may be used as an example for a custom Meld FHIR Resource server.
 
 # Default Ports
 The following default port assignments exist
@@ -106,7 +106,7 @@ The service is available at (see default ports):
 If you wish to migrate sandboxes from previous HAPI versions, see /reference-api-webapp/src/main/resources/db/migration for the appropriate migration scripts.
 
 ## Open Mode ##
-When the Logica Reference API server is run in open mode, no security is applied.  This is very convenient for development, allowing resources to be read and written without authentication.  See reference-api-webapp/src/main/resources/application.yml.
+When the Meld Reference API server is run in open mode, no security is applied.  This is very convenient for development, allowing resources to be read and written without authentication.  See reference-api-webapp/src/main/resources/application.yml.
 * hspc.platform.api.security.mode=open
 
 ### Sample Operations ###
@@ -114,12 +114,9 @@ When the Logica Reference API server is run in open mode, no security is applied
 * http://localhost:8078/hspc8/open/Observation
 
 ## Secured Mode ##
-When the Logica Reference API server is run in secured mode, authentication is required for most endpoints with the exception of the conformance statement.  See reference-api-webapp/src/main/resources/application.yml.
+When the Meld Reference API server is run in secured mode, authentication is required for most endpoints with the exception of the conformance statement.  See reference-api-webapp/src/main/resources/application.yml.
 * hspc.platform.api.security.mode=secured
 
 ## Configuration ##
 
 See reference-api-webapp/src/main/resources/application.yml for an initial listing of properties that may be overridden.
-
-## Where to go from here ##
-https://logica.atlassian.net/wiki/spaces/HSPC/overview

@@ -92,7 +92,7 @@ hspc:
         profileResources: StructureDefinition, CodeSystem, ValueSet, SearchParameter
         maxPageSize: 200
         defaultPageSize: 50
-        description: LogicalHealth FHIR CDR # Shows up in /metadata response
+        description: Meld FHIR CDR # Shows up in /metadata response
         fhirSecureServletPath: /data
         fhirOpenServletPath: /open
     # these values are used for internal calls to the auth server
@@ -207,5 +207,5 @@ smart-configuration-metadata:
   management_endpoint: ${hspc.platform.authorization.url}/manage
   introspection_endpoint: ${hspc.platform.authorization.url}/introspect
   revocation_endpoint: ${hspc.platform.authorization.url}/revoke
-  capabilities: ["launch-ehr", "client-public", "client-confidential-symmetric", "context-ehr-patient", "sso-openid-connect", "launch-standalone"]
+  capabilities: ["launch-ehr", "client-public", "client-confidential-symmetric", "context-ehr-patient", "sso-openid-connect", "launch-standalone", "context-standalone-patient", "permission-offline", "permission-patient"]
 
