@@ -92,7 +92,7 @@ hspc:
         profileResources: StructureDefinition, CodeSystem, ValueSet, SearchParameter
         maxPageSize: 200
         defaultPageSize: 50
-        description: LogicalHealth FHIR CDR # Shows up in /metadata response
+        description: Meld FHIR CDR # Shows up in /metadata response
         fhirSecureServletPath: /data
         fhirOpenServletPath: /open
     # these values are used for internal calls to the auth server
