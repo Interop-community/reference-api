@@ -27,6 +27,7 @@ import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.config.HapiFhirLocalContainerEntityManagerFactoryBean;
 import ca.uhn.fhir.jpa.interceptor.CascadingDeleteInterceptor;
 import ca.uhn.fhir.jpa.model.entity.ModelConfig;
+import ca.uhn.fhir.jpa.search.LuceneSearchMappingFactory;
 import ca.uhn.fhir.rest.server.interceptor.LoggingInterceptor;
 import ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor;
 import org.hibernate.MultiTenancyStrategy;
@@ -107,16 +108,16 @@ public class FhirServerJpaConfig {
         extraProperties.put("hibernate.dialect", org.hibernate.dialect.MySQL57Dialect.class.getName());
         extraProperties.put("hibernate.format_sql", "true");
         extraProperties.put("hibernate.show_sql", "false");
-        extraProperties.put("hibernate.hbm2ddl.auto", "none");
+        extraProperties.put("hibernate.hbm2ddl.auto", "update");
         extraProperties.put("hibernate.jdbc.batch_size", "20");
         extraProperties.put("hibernate.cache.use_query_cache", "false");
         extraProperties.put("hibernate.cache.use_second_level_cache", "false");
         extraProperties.put("hibernate.cache.use_structured_entries", "false");
         extraProperties.put("hibernate.cache.use_minimal_puts", "false");
+        extraProperties.put("hibernate.search.model_mapping", LuceneSearchMappingFactory.class.getName());
         extraProperties.put("hibernate.search.default.directory_provider", "filesystem");
         extraProperties.put("hibernate.search.default.indexBase", "target/lucenefiles");
         extraProperties.put("hibernate.search.lucene_version", "LUCENE_CURRENT");
-        extraProperties.put("hibernate.search.autoregister_listeners", "false"); // set to false to disable lucene
         // multi-tenant properties
         extraProperties.put(Environment.MULTI_TENANT, MultiTenancyStrategy.DATABASE);
         extraProperties.put(Environment.MULTI_TENANT_CONNECTION_PROVIDER, multiTenantConnectionProvider);
