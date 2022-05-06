@@ -9,6 +9,8 @@ hspc:
           host: ${DB_HOST:sandboxdb.interop.community}
           username: ${DB_USER:system}
           password: ${DB_PASSWORD:password}
+        sandboxGateway:
+          url: ${GATEWAY_HOST}
       sandboxManagerApi:
         url: ${SBMA_HOST:https://sandbox-api.interop.community}
         transactionPath: /analytics/transaction

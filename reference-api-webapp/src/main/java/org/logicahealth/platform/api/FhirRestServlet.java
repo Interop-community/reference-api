@@ -52,6 +52,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.servlet.ServletException;
 import java.util.Collection;
@@ -87,6 +88,9 @@ public class FhirRestServlet extends RestfulServer {
     private String fhirOpenServletPath;
 
     private String fhirOpenServletPathPart;
+
+    @Value("${hspc.platform.api.fhir.sandboxGateway.url}")
+    private String gatewayUrl;
 
     DaoRegistry registry;
 
@@ -293,6 +297,21 @@ public class FhirRestServlet extends RestfulServer {
             // continue
             result.append("/");
         }
+         
+        if (gatewayUrl != null){
+            
+            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(fhirServerBase);
+
+            String gwHost = UriComponentsBuilder.fromHttpUrl(gatewayUrl).build().getHost();
+
+            String localizedBase =  builder.host(gwHost).toUriString();
+    
+            DaoConfig retVal = myAppCtx.getBean(DaoConfig.class);
+
+            retVal.getTreatBaseUrlsAsLocal().add(localizedBase);
+
+        }
+   
         return fhirServerBase;
 //        throw new RuntimeException("Something bad happened, only matched: " + result.toString());
     }
