@@ -9,6 +9,18 @@ hspc:
           host: ${DB_HOST:sandboxdb.interop.community}
           username: ${DB_USER:system}
           password: ${DB_PASSWORD:password}
+        subscription:
+          resthook_enabled: false
+          websocket_enabled: false
+          email:
+            from: noreply@interop.community
+            host: email-smtp.us-east-1.amazonaws.com
+            username: AKIA23AVTA7FKSU5ISWN
+            password: BEFiFTXd0dohNK5T+73hVPxQns27PUU3xPyGs6aYYKfJ
+            port: 587
+            auth: true
+            startTlsEnable: true
+            startTlsRequired: false 
       sandboxManagerApi:
         url: ${SBMA_HOST:https://sandbox-api.interop.community}
         transactionPath: /analytics/transaction

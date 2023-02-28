@@ -20,19 +20,18 @@
 
 package org.logicahealth.platform.api.config;
 
-import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.interceptor.api.IInterceptorBroadcaster;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
-import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
-import ca.uhn.fhir.jpa.config.HapiFhirLocalContainerEntityManagerFactoryBean;
-import ca.uhn.fhir.jpa.interceptor.CascadingDeleteInterceptor;
-import ca.uhn.fhir.jpa.model.entity.ModelConfig;
-import ca.uhn.fhir.rest.server.interceptor.LoggingInterceptor;
-import ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor;
+import java.util.Optional;
+import java.util.Properties;
+
+import javax.persistence.EntityManagerFactory;
+import javax.sql.DataSource;
+
 import org.hibernate.MultiTenancyStrategy;
 import org.hibernate.cfg.Environment;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
 import org.hibernate.engine.jdbc.connections.spi.MultiTenantConnectionProvider;
+import org.hl7.fhir.dstu2.model.Subscription;
+import org.logicahealth.platform.api.SubscriptionProperties;
 import org.logicahealth.platform.api.multitenant.db.DataSourceRepository;
 import org.springframework.beans.factory.annotation.Autowire;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,9 +43,18 @@ import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import javax.persistence.EntityManagerFactory;
-import javax.sql.DataSource;
-import java.util.Properties;
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.interceptor.api.IInterceptorBroadcaster;
+import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
+import ca.uhn.fhir.jpa.config.HapiFhirLocalContainerEntityManagerFactoryBean;
+import ca.uhn.fhir.jpa.interceptor.CascadingDeleteInterceptor;
+import ca.uhn.fhir.jpa.model.entity.ModelConfig;
+import ca.uhn.fhir.jpa.subscription.channel.subscription.SubscriptionDeliveryHandlerFactory;
+import ca.uhn.fhir.jpa.subscription.match.deliver.email.IEmailSender;
+import ca.uhn.fhir.jpa.subscription.match.deliver.email.JavaMailEmailSender;
+import ca.uhn.fhir.rest.server.interceptor.LoggingInterceptor;
+import ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor;
 
 @Configuration
 @EnableTransactionManagement
@@ -58,6 +66,9 @@ public class FhirServerJpaConfig {
     @Autowired
     @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
     private FhirContext fhirContext;
+
+    @Autowired
+    SubscriptionProperties subProperties;
     /**
      * Configure FHIR properties around the the JPA server via this bean
      */
@@ -72,12 +83,40 @@ public class FhirServerJpaConfig {
         retVal.setAllowContainsSearches(true);
         retVal.setExpungeEnabled(true);
         retVal.setUseLegacySearchBuilder(true);
+
+        if(subProperties != null) {
+            // Subscriptions are enabled by channel type
+            if (subProperties.getResthook_enabled()) {
+              retVal.addSupportedSubscriptionType(org.hl7.fhir.dstu2.model.Subscription.SubscriptionChannelType.RESTHOOK);
+            }
+            if (subProperties.getEmail() != null) {
+              retVal.addSupportedSubscriptionType(org.hl7.fhir.dstu2.model.Subscription.SubscriptionChannelType.EMAIL);
+
+            }
+            if (subProperties.getWebsocket_enabled()) {
+              retVal.addSupportedSubscriptionType(org.hl7.fhir.dstu2.model.Subscription.SubscriptionChannelType.WEBSOCKET);
+            }
+          }
+
         return retVal;
     }
 
     @Bean
     public ModelConfig modelConfig() {
-        return daoConfig().getModelConfig();
+        ModelConfig modelConfig = daoConfig().getModelConfig();
+
+        if(subProperties != null && subProperties.getEmail() != null)
+        modelConfig.setEmailFromAddress(subProperties.getEmail().getFrom());
+
+      // You can enable these if you want to support Subscriptions from your server
+      if (subProperties != null && subProperties.getResthook_enabled() != null) {
+        modelConfig.addSupportedSubscriptionType(Subscription.SubscriptionChannelType.RESTHOOK);
+      }
+
+      if (subProperties  != null && subProperties.getEmail() != null) {
+        modelConfig.addSupportedSubscriptionType(Subscription.SubscriptionChannelType.EMAIL);
+      }
+        return modelConfig;
     }
 
     @Bean
@@ -158,6 +197,31 @@ public class FhirServerJpaConfig {
     @Bean
     public CascadingDeleteInterceptor cascadingDeleteInterceptor (DaoRegistry theDaoRegistry, IInterceptorBroadcaster theInterceptorBroadcaster) {
         return new CascadingDeleteInterceptor(fhirContext, theDaoRegistry, theInterceptorBroadcaster);
+    }
+
+    @Bean()
+    public IEmailSender emailSender(Optional<SubscriptionDeliveryHandlerFactory> subscriptionDeliveryHandlerFactory) {
+      if (subProperties != null && subProperties.getEmail() != null) {
+        JavaMailEmailSender retVal = new JavaMailEmailSender();
+
+        SubscriptionProperties.Email email = subProperties.getEmail();
+        retVal.setSmtpServerHostname(email.getHost());
+        retVal.setSmtpServerPort(email.getPort());
+        retVal.setSmtpServerUsername(email.getUsername());
+        retVal.setSmtpServerPassword(email.getPassword());
+        retVal.setAuth(email.getAuth());
+        retVal.setStartTlsEnable(email.getStartTlsEnable());
+        retVal.setStartTlsRequired(email.getStartTlsRequired());
+        retVal.setQuitWait(email.getQuitWait());
+
+        if(subscriptionDeliveryHandlerFactory.isPresent())
+         subscriptionDeliveryHandlerFactory.get().setEmailSender(retVal);
+
+
+        return retVal;
+      }
+
+      return null;
     }
 
 }

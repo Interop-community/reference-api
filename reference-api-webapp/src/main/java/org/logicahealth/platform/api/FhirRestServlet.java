@@ -33,6 +33,9 @@ import ca.uhn.fhir.jpa.provider.JpaSystemProviderDstu2;
 import ca.uhn.fhir.jpa.provider.dstu3.JpaSystemProviderDstu3;
 import ca.uhn.fhir.jpa.provider.r4.JpaSystemProviderR4;
 import ca.uhn.fhir.jpa.provider.r5.JpaSystemProviderR5;
+import ca.uhn.fhir.jpa.provider.SubscriptionTriggeringProvider;
+import ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor;
+import ca.uhn.fhir.interceptor.api.IInterceptorService;
 import ca.uhn.fhir.jpa.search.DatabaseBackedPagingProvider;
 import ca.uhn.fhir.jpa.searchparam.registry.ISearchParamRegistry;
 import ca.uhn.fhir.model.dstu2.composite.MetaDt;
@@ -53,10 +56,13 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
+import org.springframework.context.annotation.Import;
+
 import javax.servlet.ServletException;
 import java.util.Collection;
 
 @Component("fhirRestServlet")
+@Import(SubscriptionProperties.class)
 public class FhirRestServlet extends RestfulServer {
 
     private static final long serialVersionUID = 1L;
@@ -66,6 +72,9 @@ public class FhirRestServlet extends RestfulServer {
 
     @Autowired
     private Environment environment;
+
+    @Autowired
+    IInterceptorService interceptorService;
 
     // The FhirContext is created in the "BaseJavaConfig<fhirVersion>" class. So for STU3, it is "BaseJavaConfigDstu3"
     @Autowired
@@ -85,6 +94,10 @@ public class FhirRestServlet extends RestfulServer {
 
     @Value("${hspc.platform.api.fhir.fhirOpenServletPath}")
     private String fhirOpenServletPath;
+
+
+    @Autowired
+    SubscriptionProperties subProperties;
 
     private String fhirOpenServletPathPart;
 
@@ -132,6 +145,13 @@ public class FhirRestServlet extends RestfulServer {
         }
         registerProviders(resourceProviders.createProviders());
         registerProvider(systemProvider);
+        registerProvider(myAppCtx.getBean(SubscriptionTriggeringProvider.class));
+
+        if (subProperties != null) {
+            // Subscription debug logging
+            interceptorService.registerInterceptor(new SubscriptionDebugLogInterceptor());
+          }
+
 
         /*
          * The conformance provider exports the supported resources, search parameters, etc for

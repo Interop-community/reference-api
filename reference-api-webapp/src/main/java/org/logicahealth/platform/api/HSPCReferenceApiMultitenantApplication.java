@@ -35,6 +35,12 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ScheduledExecutorFactoryBean;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import ca.uhn.fhir.jpa.subscription.channel.config.SubscriptionChannelConfig;
+import ca.uhn.fhir.jpa.subscription.match.config.SubscriptionProcessorConfig;
+import ca.uhn.fhir.jpa.subscription.submit.config.SubscriptionSubmitterConfig;
+
+import org.springframework.context.annotation.Import;
+
 
 @EnableWebSecurity(debug = false)
 @EnableCaching
@@ -42,6 +48,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 @EnableAsync
 @EnableEncryptableProperties
 @EnableBatchProcessing
+@Import({SubscriptionSubmitterConfig.class, SubscriptionProcessorConfig.class, SubscriptionChannelConfig.class})
 public class HSPCReferenceApiMultitenantApplication extends SpringBootServletInitializer {
 
     public static void main(String[] args) {

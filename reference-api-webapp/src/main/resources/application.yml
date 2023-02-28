@@ -79,6 +79,19 @@ hspc:
           cache:
             size: ${DATASOURCE_CACHE_SIZE:15}
           defaultTenant: ${hspc.platform.api.sandbox.name}
+        subscription:
+          resthook_enabled: false
+          websocket_enabled: false
+          email:
+            from: some@test.com
+            host: google.com
+            port:
+            username:
+            password:
+            auth:
+            startTlsEnable:
+            startTlsRequired:
+            quitWait:
         templateSandboxes: MasterDstu2Empty, MasterDstu2Smart, MasterStu3Empty, MasterStu3Smart, MasterR4Empty, MasterR4Smart
         hibernate:
           dialect: org.hibernate.dialect.MySQL5Dialect
