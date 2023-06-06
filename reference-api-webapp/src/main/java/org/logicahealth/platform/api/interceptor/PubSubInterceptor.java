@@ -144,7 +144,8 @@ public class PubSubInterceptor extends SubscriptionSupportBase {
             case DSTU3:
                 return getTargetResourceForSTU3(theRequestDetails, theResponseObject);
             case R4:
-                throw new RuntimeException("R4 is not supported for PubSubInterceptor");
+                return getTargetResourceForR4(theRequestDetails, theResponseObject);
+                // throw new RuntimeException("R4 is not supported for PubSubInterceptor");
         }
         throw new RuntimeException("No match");
     }

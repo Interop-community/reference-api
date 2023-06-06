@@ -121,12 +121,12 @@ hspc:
       url: ${hspc.platform.manifest.protocol}://${hspc.platform.manifest.host}:${hspc.platform.manifest.port}${hspc.platform.manifest.context}
     messaging:
       pubsub:
-        enabled: false
-        forSandboxes:
+        enabled: ${MESSAGING_OVERRIDE:false}
+        forSandboxes: ${MESSAGING_SANDBOXES}
         subscription:
           channel:
-            endpoint:
-        includeSourceQueryParameter: true
+            endpoint:  ${MESSAGING_ENDPOINT}
+        includeSourceQueryParameter: ${MESSAGING_INCLDESOURCEQUERYPARAMETER:true}
 
 management:
   health:
