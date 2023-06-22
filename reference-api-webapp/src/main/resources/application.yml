@@ -122,10 +122,10 @@ hspc:
     messaging:
       pubsub:
         enabled: ${MESSAGING_OVERRIDE:false}
-        forSandboxes: ${MESSAGING_SANDBOXES}
+        forSandboxes: ${MESSAGING_SANDBOXES:""}
         subscription:
           channel:
-            endpoint:  ${MESSAGING_ENDPOINT}
+            endpoint:  ${MESSAGING_ENDPOINT:""}
         includeSourceQueryParameter: ${MESSAGING_INCLDESOURCEQUERYPARAMETER:true}
 
 management:

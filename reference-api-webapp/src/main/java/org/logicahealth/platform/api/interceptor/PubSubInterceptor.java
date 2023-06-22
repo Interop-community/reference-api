@@ -41,6 +41,11 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.HttpResponse;
+
 @Component
 @Profile("multitenant")
 public class PubSubInterceptor extends SubscriptionSupportBase {
@@ -86,30 +91,33 @@ public class PubSubInterceptor extends SubscriptionSupportBase {
     public boolean outgoingResponse(RequestDetails theRequestDetails, IBaseResource theResponseObject, HttpServletRequest theServletRequest, HttpServletResponse theServletResponse) {
         if (enabled) {
             switch (theRequestDetails.getRestOperationType()) {
-                case CREATE:
-                case UPDATE:
-//                case DELETE:
+                case CREATE: case UPDATE:
                     if (!Strings.isNullOrEmpty(forwardUrl)) {
 //                        if (forResources.contains(theResponseObject.getClass().getSimpleName())) {
                         String requestSandbox = FhirRestServlet.getTenantPart(theServletRequest.getServletPath());
 
-                        if (forSandboxes.contains(requestSandbox)) {
+                        // Chit commented out to support all sandboxes for Broward
+                        // if (forSandboxes.contains(requestSandbox)) {
                             IBaseResource targetResource = findTargetResource(theRequestDetails, theResponseObject);
                             if (targetResource == null) {
                                 LOGGER.warn("Unable to find resource for request: " + theRequestDetails);
                                 break;
                             }
                             LOGGER.info("Matched resource: " + theResponseObject.getIdElement().getIdPart());
+
+                            //Chit added this
+                            String pathforMessaging =  targetResource.getIdElement().getResourceType().equals("Subscription") ? "/subscription" : "/resource";
+
                             if (includeSourceQueryParameter) {
                                 try {
                                     String fhirRootPath = theRequestDetails.getFhirServerBase();
-                                    if (fhirRootPath.contains("/data")) {
-                                        fhirRootPath = fhirRootPath.substring(0, fhirRootPath.indexOf("/data"));
-                                    } else if (fhirRootPath.contains("/open")) {
-                                        fhirRootPath = fhirRootPath.substring(0, fhirRootPath.indexOf("/open"));
-                                    }
+                                    // if (fhirRootPath.contains("/data")) {
+                                    //     fhirRootPath = fhirRootPath.substring(0, fhirRootPath.indexOf("/data"));
+                                    // } else if (fhirRootPath.contains("/open")) {
+                                    //     fhirRootPath = fhirRootPath.substring(0, fhirRootPath.indexOf("/open"));
+                                    // }
                                     LOGGER.info("Source path: " + fhirRootPath);
-                                    handleResource(targetResource, forwardUrl
+                                    handleResource(targetResource, forwardUrl + pathforMessaging 
                                             + "?source="
                                             + URLEncoder.encode(fhirRootPath, StandardCharsets.UTF_8.toString()));
                                 } catch (Exception e) {
@@ -120,13 +128,34 @@ public class PubSubInterceptor extends SubscriptionSupportBase {
                                                     + " forwardUrl: " + forwardUrl, e);
                                 }
                             } else {
-                                handleResource(targetResource, forwardUrl);
+                                handleResource(targetResource, forwardUrl + pathforMessaging);
                             }
-                        }
+                        // }
 //                        }
                     }
                     break;
-            }
+            
+                case DELETE:
+                    try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+                        String resourceUrl = theRequestDetails.getCompleteUrl();
+                        HttpDelete httpDelete = new HttpDelete(forwardUrl + "/subscription" + "?source="
+                                + URLEncoder.encode(resourceUrl, StandardCharsets.UTF_8.toString()));
+
+                        LOGGER.info("DELETING " + resourceUrl + " from messaging endpoint.");
+                        HttpResponse response = httpclient.execute(httpDelete);
+                        if (response.getStatusLine().getStatusCode() != 200) {
+
+                            LOGGER.error("Error deleting rule[" + resourceUrl
+                                    + "] from messaging /Subscription endpoint.  Status Code: "
+                                    + response.getStatusLine().getStatusCode());
+                        }
+
+                    } catch (Exception e) {
+                        LOGGER.error("Error while deleting rule from messaging" + e);
+
+                    }
+                    break;
+}
         }
 
         return super.outgoingResponse(theRequestDetails, theResponseObject, theServletRequest, theServletResponse);

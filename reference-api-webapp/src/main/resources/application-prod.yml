@@ -16,12 +16,12 @@ hspc:
       url: ${AUTH_HOST:https://auth.interop.community}
     messaging:
       pubsub:
-        enabled: true
-        forSandboxes: travisdstu2,PulmonaryEmbolismDSTU2,noman_dstu2,nomanstu3,nomandstu2,PulmonaryEmbolism2,PulmonaryEmbolismVer
+        enabled: ${MESSAGING_OVERRIDE:false}
+        forSandboxes: ${MESSAGING_SANDBOXES:""}
         subscription:
           channel:
-            endpoint: http://pubsub.interop.community:9002/fhir-subscription/publish
-        includeSourceQueryParameter: true
+            endpoint:  ${MESSAGING_ENDPOINT:""}
+        includeSourceQueryParameter: ${MESSAGING_INCLDESOURCEQUERYPARAMETER:true}
 
 jasypt:
   encryptor:
