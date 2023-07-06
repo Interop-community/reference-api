@@ -90,6 +90,7 @@ public class PubSubInterceptor extends SubscriptionSupportBase {
     @Override
     public boolean outgoingResponse(RequestDetails theRequestDetails, IBaseResource theResponseObject, HttpServletRequest theServletRequest, HttpServletResponse theServletResponse) {
         if (enabled) {
+           
             switch (theRequestDetails.getRestOperationType()) {
                 case CREATE: case UPDATE:
                     if (!Strings.isNullOrEmpty(forwardUrl)) {
@@ -99,6 +100,7 @@ public class PubSubInterceptor extends SubscriptionSupportBase {
                         // Chit commented out to support all sandboxes for Broward
                         // if (forSandboxes.contains(requestSandbox)) {
                             IBaseResource targetResource = findTargetResource(theRequestDetails, theResponseObject);
+                            String fhirRootPath = theRequestDetails.getFhirServerBase().replace("/open","").replace("/data","");
                             if (targetResource == null) {
                                 LOGGER.warn("Unable to find resource for request: " + theRequestDetails);
                                 break;
@@ -110,7 +112,7 @@ public class PubSubInterceptor extends SubscriptionSupportBase {
 
                             if (includeSourceQueryParameter) {
                                 try {
-                                    String fhirRootPath = theRequestDetails.getFhirServerBase();
+                                    // String fhirRootPath = theRequestDetails.getFhirServerBase();
                                     // if (fhirRootPath.contains("/data")) {
                                     //     fhirRootPath = fhirRootPath.substring(0, fhirRootPath.indexOf("/data"));
                                     // } else if (fhirRootPath.contains("/open")) {
@@ -136,23 +138,29 @@ public class PubSubInterceptor extends SubscriptionSupportBase {
                     break;
             
                 case DELETE:
-                    try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
-                        String resourceUrl = theRequestDetails.getCompleteUrl();
-                        HttpDelete httpDelete = new HttpDelete(forwardUrl + "/subscription" + "?source="
-                                + URLEncoder.encode(resourceUrl, StandardCharsets.UTF_8.toString()));
+                    String resourceUrl =  theRequestDetails.getCompleteUrl()
+                                        .replace("/open","").replace("/data","")
+                                        .replace("?_id=","/");
+                    if (resourceUrl.contains("Subscription")){
+                        try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+                            if(resourceUrl.contains("history"))
+                                resourceUrl = resourceUrl.substring(0, resourceUrl.indexOf("/_history"));
+                            HttpDelete httpDelete = new HttpDelete(forwardUrl + "/subscription" + "?source="
+                                    + URLEncoder.encode(resourceUrl, StandardCharsets.UTF_8.toString()));
 
-                        LOGGER.info("DELETING " + resourceUrl + " from messaging endpoint.");
-                        HttpResponse response = httpclient.execute(httpDelete);
-                        if (response.getStatusLine().getStatusCode() != 200) {
+                            LOGGER.info("DELETING " + resourceUrl + " from messaging endpoint.");
+                            HttpResponse response = httpclient.execute(httpDelete);
+                            if (response.getStatusLine().getStatusCode() != 200) {
 
-                            LOGGER.error("Error deleting rule[" + resourceUrl
-                                    + "] from messaging /Subscription endpoint.  Status Code: "
-                                    + response.getStatusLine().getStatusCode());
+                                LOGGER.error("Error deleting rule[" + resourceUrl
+                                        + "] from messaging /Subscription endpoint.  Status Code: "
+                                        + response.getStatusLine().getStatusCode());
+                            }
+
+                        } catch (Exception e) {
+                            LOGGER.error("Error while deleting rule from messaging" + e);
+
                         }
-
-                    } catch (Exception e) {
-                        LOGGER.error("Error while deleting rule from messaging" + e);
-
                     }
                     break;
 }
