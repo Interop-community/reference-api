@@ -43,6 +43,8 @@ import ca.uhn.fhir.rest.server.RestfulServer;
 import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor;
 import ca.uhn.fhir.rest.server.provider.ResourceProviderFactory;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
+import ca.uhn.fhir.jpa.bulk.provider.BulkDataExportProvider;
+
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.dstu3.model.Meta;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -85,6 +87,12 @@ public class FhirRestServlet extends RestfulServer {
 
     @Value("${hspc.platform.api.fhir.fhirOpenServletPath}")
     private String fhirOpenServletPath;
+
+    @Value("${hspc.platform.api.fhir.bulkExportEnabled}")
+    private boolean bulkExportEnabled;
+
+    @Autowired
+    BulkDataExportProvider bulkDataExportProvider;
 
     private String fhirOpenServletPathPart;
 
@@ -132,6 +140,9 @@ public class FhirRestServlet extends RestfulServer {
         }
         registerProviders(resourceProviders.createProviders());
         registerProvider(systemProvider);
+
+        if(bulkExportEnabled)
+            registerProvider(bulkDataExportProvider);
 
         /*
          * The conformance provider exports the supported resources, search parameters, etc for
