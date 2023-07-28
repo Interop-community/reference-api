@@ -43,7 +43,8 @@ import ca.uhn.fhir.rest.server.RestfulServer;
 import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor;
 import ca.uhn.fhir.rest.server.provider.ResourceProviderFactory;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
-import ca.uhn.fhir.jpa.bulk.provider.BulkDataExportProvider;
+// import ca.uhn.fhir.jpa.bulk.provider.BulkDataExportProvider;
+import  org.logicahealth.platform.api.bulk.BulkDataExportProvider;
 
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.dstu3.model.Meta;
@@ -140,9 +141,6 @@ public class FhirRestServlet extends RestfulServer {
         }
         registerProviders(resourceProviders.createProviders());
         registerProvider(systemProvider);
-
-        if(bulkExportEnabled)
-            registerProvider(bulkDataExportProvider);
 
         /*
          * The conformance provider exports the supported resources, search parameters, etc for
@@ -245,6 +243,9 @@ public class FhirRestServlet extends RestfulServer {
         if (fhirVersion == FhirVersionEnum.R4) {
             registerProvider(myAppCtx.getBean(ca.uhn.fhir.jpa.provider.TerminologyUploaderProvider.class));
         }
+
+        if(bulkExportEnabled)
+            registerProvider(bulkDataExportProvider);
     }
 
     /**

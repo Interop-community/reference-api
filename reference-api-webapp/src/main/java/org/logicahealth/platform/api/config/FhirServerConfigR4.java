@@ -21,8 +21,13 @@
 package org.logicahealth.platform.api.config;
 
 import ca.uhn.fhir.jpa.api.svc.ISearchCoordinatorSvc;
+import ca.uhn.fhir.jpa.bulk.api.IBulkDataExportSvc;
 import ca.uhn.fhir.jpa.config.BaseJavaConfigR4;
 import ca.uhn.fhir.jpa.search.DatabaseBackedPagingProvider;
+
+import org.logicahealth.platform.api.bulk.BulkDataExportProvider;
+import org.logicahealth.platform.api.bulk.BulkDataExportSvcImpl;
+
 import org.logicahealth.platform.api.search.LogicaSearchCoordinatorSvcImpl;
 import org.springframework.beans.factory.annotation.Autowire;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,5 +59,18 @@ public class FhirServerConfigR4 extends BaseJavaConfigR4 {
         pagingProvider.setMaximumPageSize(maxPageSize);
         return pagingProvider;
     }
+
+
+    @Bean
+	public IBulkDataExportSvc bulkDataExportSvc() {
+		return new BulkDataExportSvcImpl();
+	}
+
+	@Bean
+	public BulkDataExportProvider bulkDataExportProvider() {
+		return new BulkDataExportProvider();
+	}
+
+
 
 }
