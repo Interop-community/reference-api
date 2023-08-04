@@ -47,6 +47,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.*;
 
 import static ca.uhn.fhir.util.UrlUtil.escapeUrlParam;
 import static ca.uhn.fhir.util.UrlUtil.escapeUrlParams;
@@ -96,6 +97,7 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 			Pageable page = PageRequest.of(0, 1);
 			Slice<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByStatus(page, BulkJobStatusEnum.SUBMITTED);
             System.out.println("Chit prints from 97 "+ submittedJobs);
+			System.out.println("bulkExportFiles thread: " + Thread.currentThread().getName());
 			if (submittedJobs.isEmpty()) {
 				return Optional.empty();
 			}
@@ -106,16 +108,17 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 			return;
 		}
 
-		Optional<BulkExportJobEntity>  jobUuid = myBulkExportJobDao.findByJobId("b813bd66-e9c1-4bd1-97c2-47195c4b3121"); //jobToProcessOpt.get().getJobId();
+		// Optional<BulkExportJobEntity>  jobUuid = myBulkExportJobDao.findByJobId("91c6044a-4ad6-41fa-8ae3-5a8d3e361b50"); //jobToProcessOpt.get().getJobId();
+		String jobUuid = jobToProcessOpt.get().getJobId();
 
 		try {
             System.out.println("Chit hit here from 110 "+ jobUuid );
-			if (jobUuid.isPresent())
-					processJob(jobUuid.get().getJobId());
+			// if (jobUuid.isPresent())
+					processJob(jobUuid);
 		} catch (Exception e) {
 			ourLog.error("Failure while preparing bulk export extract", e);
 			myTxTemplate.execute(t -> {
-				Optional<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByJobId(jobUuid.get().getJobId());
+				Optional<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByJobId(jobUuid);
 				if (submittedJobs.isPresent()) {
 					BulkExportJobEntity jobEntity = submittedJobs.get();
 					jobEntity.setStatus(BulkJobStatusEnum.ERROR);
@@ -205,10 +208,10 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		jobDetail.setJobClass(Job.class);
 		mySchedulerService.scheduleClusteredJob(10 * DateUtils.MILLIS_PER_SECOND, jobDetail);
 
-		jobDetail = new ScheduledJobDefinition();
-		jobDetail.setId(PurgeExpiredFilesJob.class.getName());
-		jobDetail.setJobClass(PurgeExpiredFilesJob.class);
-		mySchedulerService.scheduleClusteredJob(DateUtils.MILLIS_PER_HOUR, jobDetail);
+		// jobDetail = new ScheduledJobDefinition();
+		// jobDetail.setId(PurgeExpiredFilesJob.class.getName());
+		// jobDetail.setJobClass(PurgeExpiredFilesJob.class);
+		// mySchedulerService.scheduleClusteredJob(DateUtils.MILLIS_PER_HOUR, jobDetail);
 	}
 
 	@Transactional
@@ -335,17 +338,18 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	@Transactional
 	@Override
 	public JobInfo getJobInfoOrThrowResourceNotFound(String theJobId) {
-		// 	Optional<BulkExportJobEntity> jobToProcessOpt = myTxTemplate.execute(t -> {
-		// 	Pageable page = PageRequest.of(0, 1);
-		// 	Slice<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByStatus(page, BulkJobStatusEnum.SUBMITTED);
-        //     System.out.println("Chit prints from 97 "+ submittedJobs);
-		// 	if (submittedJobs.isEmpty()) {
-		// 		return Optional.empty();
-		// 	}
-		// 	return Optional.of(submittedJobs.getContent().get(0));
-		// });
+			Optional<BulkExportJobEntity> jobToProcessOpt = myTxTemplate.execute(t -> {
+			Pageable page = PageRequest.of(0, 1);
+			Slice<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByStatus(page, BulkJobStatusEnum.SUBMITTED);
+            System.out.println("Chit prints from 97 "+ submittedJobs);
+			System.out.println("getJobInfo thread: " + Thread.currentThread().getName());
+			if (submittedJobs.isEmpty()) {
+				return Optional.empty();
+			}
+			return Optional.of(submittedJobs.getContent().get(0));
+		});
 
-		// System.out.println("jobToProcessOpt:" + jobToProcessOpt);
+		System.out.println("jobToProcessOpt:" + jobToProcessOpt);
 		
 		BulkExportJobEntity job = myBulkExportJobDao
 			.findByJobId(theJobId)
