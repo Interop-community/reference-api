@@ -35,6 +35,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
+import org.springframework.context.annotation.Lazy;
+
 
 @Configuration
 @Profile("r4")
@@ -62,11 +64,13 @@ public class FhirServerConfigR4 extends BaseJavaConfigR4 {
 
 
     @Bean
-	public IBulkDataExportSvc bulkDataExportSvc() {
+	@Lazy
+    public IBulkDataExportSvc bulkDataExportSvc() {
 		return new BulkDataExportSvcImpl();
 	}
 
 	@Bean
+	@Lazy
 	public BulkDataExportProvider bulkDataExportProvider() {
 		return new BulkDataExportProvider();
 	}

@@ -33,6 +33,7 @@ import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.JobParametersInvalidException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -78,6 +79,9 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	@Autowired
 	private IBatchJobSubmitter myJobSubmitter;
 
+    @Value("${hspc.platform.api.fhir.datasource.defaultTenant}")
+    private String defaultTenant;
+
 	@Autowired
 	@Qualifier("bulkExportJob")
 	private org.springframework.batch.core.Job myBulkExportJob;
@@ -88,16 +92,16 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	 * This method is called by the scheduler to run a pass of the
 	 * generator
 	 */
-	@Transactional(value = Transactional.TxType.NEVER)
+	@Transactional (value = Transactional.TxType.NEVER)
 	@Override
 	public synchronized void buildExportFiles() {
-		// System.out.println("Chit prints from 93 "+ myBulkExportJobDao.findByJobId("b813bd66-e9c1-4bd1-97c2-47195c4b3121"));
+		// System.out.println("Chit prints from 93 "+ myBulkExportJobDao.findAll());
 
 		Optional<BulkExportJobEntity> jobToProcessOpt = myTxTemplate.execute(t -> {
 			Pageable page = PageRequest.of(0, 1);
 			Slice<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByStatus(page, BulkJobStatusEnum.SUBMITTED);
-            System.out.println("Chit prints from 97 "+ submittedJobs);
-			System.out.println("bulkExportFiles thread: " + Thread.currentThread().getName());
+            // System.out.println("Chit prints from 97 "+ submittedJobs);
+			// System.out.println("bulkExportFiles thread: " + Thread.currentThread().getName());
 			if (submittedJobs.isEmpty()) {
 				return Optional.empty();
 			}
@@ -112,7 +116,6 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		String jobUuid = jobToProcessOpt.get().getJobId();
 
 		try {
-            System.out.println("Chit hit here from 110 "+ jobUuid );
 			// if (jobUuid.isPresent())
 					processJob(jobUuid);
 		} catch (Exception e) {
@@ -203,15 +206,15 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	public void start() {
 		myTxTemplate = new TransactionTemplate(myTxManager);
 
-		ScheduledJobDefinition jobDetail = new ScheduledJobDefinition();
-		jobDetail.setId(Job.class.getName());
-		jobDetail.setJobClass(Job.class);
-		mySchedulerService.scheduleClusteredJob(10 * DateUtils.MILLIS_PER_SECOND, jobDetail);
+	// 	ScheduledJobDefinition jobDetail = new ScheduledJobDefinition();
+	// 	jobDetail.setId(Job.class.getName());
+	// 	jobDetail.setJobClass(Job.class);
+	// 	mySchedulerService.scheduleClusteredJob(10 * DateUtils.MILLIS_PER_SECOND, jobDetail);
 
-		// jobDetail = new ScheduledJobDefinition();
-		// jobDetail.setId(PurgeExpiredFilesJob.class.getName());
-		// jobDetail.setJobClass(PurgeExpiredFilesJob.class);
-		// mySchedulerService.scheduleClusteredJob(DateUtils.MILLIS_PER_HOUR, jobDetail);
+	// 	jobDetail = new ScheduledJobDefinition();
+	// 	jobDetail.setId(PurgeExpiredFilesJob.class.getName());
+	// 	jobDetail.setJobClass(PurgeExpiredFilesJob.class);
+	// 	mySchedulerService.scheduleClusteredJob(DateUtils.MILLIS_PER_HOUR, jobDetail);
 	}
 
 	@Transactional
@@ -283,8 +286,6 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		updateExpiry(job);
 		myBulkExportJobDao.save(job);
 
-        System.out.println("BulkDataExportSvcImpl's job : " + job.toString());
-
 
 		for (String nextType : resourceTypes) {
 
@@ -338,19 +339,18 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	@Transactional
 	@Override
 	public JobInfo getJobInfoOrThrowResourceNotFound(String theJobId) {
-			Optional<BulkExportJobEntity> jobToProcessOpt = myTxTemplate.execute(t -> {
-			Pageable page = PageRequest.of(0, 1);
-			Slice<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByStatus(page, BulkJobStatusEnum.SUBMITTED);
-            System.out.println("Chit prints from 97 "+ submittedJobs);
-			System.out.println("getJobInfo thread: " + Thread.currentThread().getName());
-			if (submittedJobs.isEmpty()) {
-				return Optional.empty();
-			}
-			return Optional.of(submittedJobs.getContent().get(0));
-		});
+		// 	Optional<BulkExportJobEntity> jobToProcessOpt = myTxTemplate.execute(t -> {
+		// 	Pageable page = PageRequest.of(0, 1);
+		// 	Slice<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByStatus(page, BulkJobStatusEnum.SUBMITTED);
+        //     System.out.println("Chit prints from 97 "+ submittedJobs);
+		// 	System.out.println("getJobInfo thread: " + Thread.currentThread().getName());
+		// 	if (submittedJobs.isEmpty()) {
+		// 		return Optional.empty();
+		// 	}
+		// 	return Optional.of(submittedJobs.getContent().get(0));
+		// });
 
-		System.out.println("jobToProcessOpt:" + jobToProcessOpt);
-		
+		// System.out.println("jobToProcessOpt:" + jobToProcessOpt);
 		BulkExportJobEntity job = myBulkExportJobDao
 			.findByJobId(theJobId)
 			.orElseThrow(() -> new ResourceNotFoundException(theJobId));
@@ -408,7 +408,7 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		private IBulkDataExportSvc myTarget;
 
 		@Override
-		public void execute(JobExecutionContext theContext) {
+		public void execute(JobExecutionContext theContext) {			
 			myTarget.buildExportFiles();
 		}
 	}
