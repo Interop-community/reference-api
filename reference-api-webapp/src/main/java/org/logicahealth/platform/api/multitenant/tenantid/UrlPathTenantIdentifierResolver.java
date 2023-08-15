@@ -40,6 +40,10 @@ public class UrlPathTenantIdentifierResolver implements CurrentTenantIdentifierR
         return defaultTenant;
     }
 
+    public void setTenantForScheduledTasks(String tenant) {
+        TenantContextHolder.setTenant(tenant);
+    }
+
     @Override
     public boolean validateExistingCurrentSessions() {
         return true;
