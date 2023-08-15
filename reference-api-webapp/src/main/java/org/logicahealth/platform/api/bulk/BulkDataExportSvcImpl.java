@@ -34,6 +34,7 @@ import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.JobParametersInvalidException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -42,15 +43,22 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.PostConstruct;
 import javax.transaction.Transactional;
-
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
-import java.util.*;
+import java.util.List;
+
 
 import static ca.uhn.fhir.util.UrlUtil.escapeUrlParam;
 import static ca.uhn.fhir.util.UrlUtil.escapeUrlParams;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
-import org.logicahealth.platform.api.multitenant.TenantManagementService;
-import org.logicahealth.platform.api.multitenant.tenantid.UrlPathTenantIdentifierResolver;
+
+
+import org.logicahealth.platform.api.multitenant.TenantManagementService;  //for multitenant awareness in scheduler's job
+import org.logicahealth.platform.api.multitenant.tenantid.UrlPathTenantIdentifierResolver; //for multitenant awareness in scheduler's job
 
 public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 
@@ -82,6 +90,14 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	private org.springframework.batch.core.Job myBulkExportJob;
 
 	private int myRetentionPeriod = (int) (2 * DateUtils.MILLIS_PER_HOUR);
+
+
+    @Value("${hspc.platform.api.fhir.bulk.schedulerEnabled}")
+    private boolean schedulerEnabled;
+
+	@Autowired
+	private BulkExportJobRunnerService bulkJobRunnerSvc;
+
 
 	/**
 	 * This method is called by the scheduler to run a pass of the
@@ -195,15 +211,17 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	public void start() {
 		myTxTemplate = new TransactionTemplate(myTxManager);
 
-		ScheduledJobDefinition jobDetail = new ScheduledJobDefinition();
-		jobDetail.setId(Job.class.getName());
-		jobDetail.setJobClass(Job.class);
-		mySchedulerService.scheduleClusteredJob(10 * DateUtils.MILLIS_PER_SECOND, jobDetail);
+		if (schedulerEnabled) {
+			ScheduledJobDefinition jobDetail = new ScheduledJobDefinition();
+			jobDetail.setId(Job.class.getName());
+			jobDetail.setJobClass(Job.class);
+			mySchedulerService.scheduleClusteredJob(10 * DateUtils.MILLIS_PER_SECOND, jobDetail);
 
-		jobDetail = new ScheduledJobDefinition();
-		jobDetail.setId(PurgeExpiredFilesJob.class.getName());
-		jobDetail.setJobClass(PurgeExpiredFilesJob.class);
-		mySchedulerService.scheduleClusteredJob(DateUtils.MILLIS_PER_HOUR, jobDetail);
+			jobDetail = new ScheduledJobDefinition();
+			jobDetail.setId(PurgeExpiredFilesJob.class.getName());
+			jobDetail.setJobClass(PurgeExpiredFilesJob.class);
+			mySchedulerService.scheduleClusteredJob(DateUtils.MILLIS_PER_HOUR, jobDetail);
+		}
 	}
 
 	@Transactional(Transactional.TxType.NEVER)
@@ -213,7 +231,6 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 				.findByJobId(jobId)
 				.orElseThrow(() -> new ResourceNotFoundException(jobId));
 		});
-		
 		if (job.getStatus() == BulkJobStatusEnum.COMPLETE){
 			myTxTemplate.execute(t -> {
 
@@ -381,6 +398,9 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 			}
 		}
 
+		if(!schedulerEnabled)
+			bulkJobRunnerSvc.runJob(this);
+
 		return retVal;
 	}
 
@@ -425,8 +445,12 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 			List<String> tenants =  tenantManagementService.findAll();	
 			for (String tenant : tenants) {
 				urlPathTenantIdentifierResolver.setTenantForScheduledTasks(tenant);
+				try{
 				myTarget.buildExportFiles();
-
+				}
+				catch(Exception e){
+					ourLog.error("Error building export files",e);
+				}
 			}	
 		}
 	}
@@ -444,7 +468,12 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 			List<String> tenants =  tenantManagementService.findAll();	
 			for (String tenant : tenants) {
 				urlPathTenantIdentifierResolver.setTenantForScheduledTasks(tenant);
+				try{
 				myTarget.purgeExpiredFiles();
+				}
+				catch(Exception e){
+					ourLog.error("Error purging expited files",e);
+				}
 
 			}
 		}

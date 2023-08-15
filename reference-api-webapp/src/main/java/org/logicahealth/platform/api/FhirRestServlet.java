@@ -89,7 +89,7 @@ public class FhirRestServlet extends RestfulServer {
     @Value("${hspc.platform.api.fhir.fhirOpenServletPath}")
     private String fhirOpenServletPath;
 
-    @Value("${hspc.platform.api.fhir.bulkExportEnabled}")
+    @Value("${hspc.platform.api.fhir.bulk.exportEnabled}")
     private boolean bulkExportEnabled;
 
     @Autowired

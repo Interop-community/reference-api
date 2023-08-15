@@ -20,6 +20,7 @@ import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
 import org.hl7.fhir.instance.model.api.IPrimitiveType;
 import org.hl7.fhir.r4.model.InstantType;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -38,12 +39,8 @@ public class BulkDataExportProvider extends ca.uhn.fhir.jpa.bulk.provider.BulkDa
     @Autowired
 	private IBulkDataExportSvc myBulkDataExportSvc;
 
-    @Autowired
-	private FhirContext myFhirContext;
-
-	@Autowired
-	private BulkExportJobRunnerService bulkJobRunnerSvc;
-
+	@Value("${hspc.platform.api.fhir.bulk.schedulerEnabled}")
+    private boolean schedulerEnabled;
 
 	@Override
 	@Operation(name = JpaConstants.OPERATION_EXPORT, global = false /* set to true once we can handle this */, manualResponse = true, idempotent = true)
@@ -80,13 +77,20 @@ public class BulkDataExportProvider extends ca.uhn.fhir.jpa.bulk.provider.BulkDa
 		String cacheControlHeader = theRequestDetails.getHeader(Constants.HEADER_CACHE_CONTROL);
 		Boolean useCache = (cacheControlHeader != null && cacheControlHeader.equals(Constants.CACHE_CONTROL_NO_CACHE)) ? false : true;
 
-		ourLog.info("useCache in BulkExport: " + useCache);
 
 		IBulkDataExportSvc.JobInfo outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
+		if(!schedulerEnabled){		
+			((BulkDataExportSvcImpl) myBulkDataExportSvc).startWithoutScheduler();
+		}
 
+
+		ourLog.info("useCache in BulkExport: " + useCache);
 		if (!useCache) {
 			((BulkDataExportSvcImpl) myBulkDataExportSvc).cancelAndPurgeJob(outcome.getJobId());
 			outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
+			if(!schedulerEnabled){		
+				((BulkDataExportSvcImpl) myBulkDataExportSvc).startWithoutScheduler();
+			}
 			}
 
 
