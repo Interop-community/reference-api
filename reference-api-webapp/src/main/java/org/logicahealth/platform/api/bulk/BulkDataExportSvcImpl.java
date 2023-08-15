@@ -98,6 +98,9 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	@Autowired
 	private BulkExportJobRunnerService bulkJobRunnerSvc;
 
+	@Autowired
+	private TenantManagementService tenantManagementService;
+
 
 	/**
 	 * This method is called by the scheduler to run a pass of the
@@ -212,10 +215,12 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		myTxTemplate = new TransactionTemplate(myTxManager);
 
 		if (schedulerEnabled) {
+			List<String> tenants =  tenantManagementService.findAll();	
+
 			ScheduledJobDefinition jobDetail = new ScheduledJobDefinition();
 			jobDetail.setId(Job.class.getName());
 			jobDetail.setJobClass(Job.class);
-			mySchedulerService.scheduleClusteredJob(10 * DateUtils.MILLIS_PER_SECOND, jobDetail);
+			mySchedulerService.scheduleClusteredJob(tenants.size() * DateUtils.MILLIS_PER_SECOND, jobDetail);
 
 			jobDetail = new ScheduledJobDefinition();
 			jobDetail.setId(PurgeExpiredFilesJob.class.getName());
@@ -226,33 +231,32 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 
 	@Transactional(Transactional.TxType.NEVER)
 	public synchronized void cancelAndPurgeJob(String jobId) {
-		BulkExportJobEntity job = myTxTemplate.execute(t -> { 
+		BulkExportJobEntity job = myTxTemplate.execute(t -> {
 			return myBulkExportJobDao
-				.findByJobId(jobId)
-				.orElseThrow(() -> new ResourceNotFoundException(jobId));
+					.findByJobId(jobId)
+					.orElseThrow(() -> new ResourceNotFoundException(jobId));
 		});
-		if (job.getStatus() == BulkJobStatusEnum.COMPLETE){
-			myTxTemplate.execute(t -> {
+		
+		myTxTemplate.execute(t -> {
 
-				for (BulkExportCollectionEntity nextCollection : job.getCollections()) {
-					for (BulkExportCollectionFileEntity nextFile : nextCollection.getFiles()) {
-						ourLog.info("Purging bulk data file: {}", nextFile.getResourceId());
-						getBinaryDao().delete(toId(nextFile.getResourceId()));
-						getBinaryDao().forceExpungeInExistingTransaction(toId(nextFile.getResourceId()), new ExpungeOptions().setExpungeDeletedResources(true).setExpungeOldVersions(true), null);
-						myBulkExportCollectionFileDao.deleteByPid(nextFile.getId());
+			for (BulkExportCollectionEntity nextCollection : job.getCollections()) {
+				for (BulkExportCollectionFileEntity nextFile : nextCollection.getFiles()) {
+					ourLog.info("Purging bulk data file: {}", nextFile.getResourceId());
+					getBinaryDao().delete(toId(nextFile.getResourceId()));
+					getBinaryDao().forceExpungeInExistingTransaction(toId(nextFile.getResourceId()),
+							new ExpungeOptions().setExpungeDeletedResources(true).setExpungeOldVersions(true), null);
+					myBulkExportCollectionFileDao.deleteByPid(nextFile.getId());
 
-					}
-
-					myBulkExportCollectionDao.deleteByPid(nextCollection.getId());
 				}
 
-				ourLog.info("*** ABOUT TO DELETE");
-				myBulkExportJobDao.deleteByPid(job.getId());
-				return null;
-			});
-		}
-	}
+				myBulkExportCollectionDao.deleteByPid(nextCollection.getId());
+			}
 
+			ourLog.info("*** ABOUT TO DELETE");
+			myBulkExportJobDao.deleteByPid(job.getId());
+			return null;
+		});
+	}
 
 	@Transactional
 	@Override
@@ -338,6 +342,11 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		return toSubmittedJobInfo(job);
 	}
 
+	@Transactional
+	public void startWithoutScheduler(){
+			bulkJobRunnerSvc.runJob(this);
+	}
+
 	public void validateTypes(Set<String> theResourceTypes) {
 		for (String nextType : theResourceTypes) {
 			if (!myDaoRegistry.isResourceTypeSupported(nextType)) {
@@ -397,9 +406,6 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 				}
 			}
 		}
-
-		if(!schedulerEnabled)
-			bulkJobRunnerSvc.runJob(this);
 
 		return retVal;
 	}
