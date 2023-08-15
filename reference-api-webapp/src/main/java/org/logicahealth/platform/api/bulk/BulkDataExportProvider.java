@@ -75,23 +75,26 @@ public class BulkDataExportProvider extends ca.uhn.fhir.jpa.bulk.provider.BulkDa
 		}
 
 		String cacheControlHeader = theRequestDetails.getHeader(Constants.HEADER_CACHE_CONTROL);
-		Boolean useCache = (cacheControlHeader != null && cacheControlHeader.equals(Constants.CACHE_CONTROL_NO_CACHE)) ? false : true;
+        String bypassScheduler = theRequestDetails.getHeader("Bypass-Scheduler");
+		bypassScheduler = bypassScheduler != null ? bypassScheduler : "false";
+        Boolean useCache = (cacheControlHeader != null && cacheControlHeader.equals(Constants.CACHE_CONTROL_NO_CACHE)) ? false : true;
 
 
-		IBulkDataExportSvc.JobInfo outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
-		if(!schedulerEnabled){		
-			((BulkDataExportSvcImpl) myBulkDataExportSvc).startWithoutScheduler();
-		}
+        IBulkDataExportSvc.JobInfo outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
+        if((schedulerEnabled && bypassScheduler.equalsIgnoreCase("true")) || !schedulerEnabled){        
+            ((BulkDataExportSvcImpl) myBulkDataExportSvc).startWithoutScheduler();
+        }
 
 
-		ourLog.info("useCache in BulkExport: " + useCache);
-		if (!useCache) {
-			((BulkDataExportSvcImpl) myBulkDataExportSvc).cancelAndPurgeJob(outcome.getJobId());
-			outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
-			if(!schedulerEnabled){		
-				((BulkDataExportSvcImpl) myBulkDataExportSvc).startWithoutScheduler();
-			}
-			}
+        ourLog.info("useCache in BulkExport: " + useCache);
+        if (!useCache) {
+            ((BulkDataExportSvcImpl) myBulkDataExportSvc).cancelAndPurgeJob(outcome.getJobId());
+            outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
+            if((schedulerEnabled && bypassScheduler.equalsIgnoreCase("true")) || !schedulerEnabled){        
+                ourLog.info("Bypassing scheduler inside !useCache");
+                ((BulkDataExportSvcImpl) myBulkDataExportSvc).startWithoutScheduler();
+            }
+            }
 
 
 		String serverBase = getServerBase(theRequestDetails);
