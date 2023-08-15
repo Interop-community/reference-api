@@ -21,6 +21,7 @@ import ca.uhn.fhir.jpa.model.util.JpaConstants;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
+
 import org.apache.commons.lang3.time.DateUtils;
 import org.hl7.fhir.instance.model.api.IBaseBinary;
 import org.hl7.fhir.instance.model.api.IIdType;
@@ -33,7 +34,6 @@ import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.JobParametersInvalidException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -42,17 +42,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.PostConstruct;
 import javax.transaction.Transactional;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+
 import java.util.stream.Collectors;
 import java.util.*;
 
 import static ca.uhn.fhir.util.UrlUtil.escapeUrlParam;
 import static ca.uhn.fhir.util.UrlUtil.escapeUrlParams;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import org.logicahealth.platform.api.multitenant.TenantManagementService;
+import org.logicahealth.platform.api.multitenant.tenantid.UrlPathTenantIdentifierResolver;
 
 public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 
@@ -79,9 +77,6 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	@Autowired
 	private IBatchJobSubmitter myJobSubmitter;
 
-    @Value("${hspc.platform.api.fhir.datasource.defaultTenant}")
-    private String defaultTenant;
-
 	@Autowired
 	@Qualifier("bulkExportJob")
 	private org.springframework.batch.core.Job myBulkExportJob;
@@ -95,28 +90,22 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	@Transactional (value = Transactional.TxType.NEVER)
 	@Override
 	public synchronized void buildExportFiles() {
-		// System.out.println("Chit prints from 93 "+ myBulkExportJobDao.findAll());
 
 		Optional<BulkExportJobEntity> jobToProcessOpt = myTxTemplate.execute(t -> {
 			Pageable page = PageRequest.of(0, 1);
 			Slice<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByStatus(page, BulkJobStatusEnum.SUBMITTED);
-            // System.out.println("Chit prints from 97 "+ submittedJobs);
-			// System.out.println("bulkExportFiles thread: " + Thread.currentThread().getName());
 			if (submittedJobs.isEmpty()) {
 				return Optional.empty();
 			}
 			return Optional.of(submittedJobs.getContent().get(0));
 		});
-        //  System.out.println("Chit hit here from 103 " + jobToProcessOpt);
 		if (!jobToProcessOpt.isPresent()) {
 			return;
 		}
 
-		// Optional<BulkExportJobEntity>  jobUuid = myBulkExportJobDao.findByJobId("91c6044a-4ad6-41fa-8ae3-5a8d3e361b50"); //jobToProcessOpt.get().getJobId();
 		String jobUuid = jobToProcessOpt.get().getJobId();
 
 		try {
-			// if (jobUuid.isPresent())
 					processJob(jobUuid);
 		} catch (Exception e) {
 			ourLog.error("Failure while preparing bulk export extract", e);
@@ -188,9 +177,9 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 			.toJobParameters();
 
 		ourLog.info("Submitting bulk export job {} to job scheduler", theJobUuid);
-
 		try {
 			myJobSubmitter.runJob(myBulkExportJob, parameters);
+			
 		} catch (JobParametersInvalidException theE) {
 			ourLog.error("Unable to start job with UUID: {}, the parameters are invalid. {}", theJobUuid, theE.getMessage());
 		}
@@ -206,16 +195,47 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	public void start() {
 		myTxTemplate = new TransactionTemplate(myTxManager);
 
-	// 	ScheduledJobDefinition jobDetail = new ScheduledJobDefinition();
-	// 	jobDetail.setId(Job.class.getName());
-	// 	jobDetail.setJobClass(Job.class);
-	// 	mySchedulerService.scheduleClusteredJob(10 * DateUtils.MILLIS_PER_SECOND, jobDetail);
+		ScheduledJobDefinition jobDetail = new ScheduledJobDefinition();
+		jobDetail.setId(Job.class.getName());
+		jobDetail.setJobClass(Job.class);
+		mySchedulerService.scheduleClusteredJob(10 * DateUtils.MILLIS_PER_SECOND, jobDetail);
 
-	// 	jobDetail = new ScheduledJobDefinition();
-	// 	jobDetail.setId(PurgeExpiredFilesJob.class.getName());
-	// 	jobDetail.setJobClass(PurgeExpiredFilesJob.class);
-	// 	mySchedulerService.scheduleClusteredJob(DateUtils.MILLIS_PER_HOUR, jobDetail);
+		jobDetail = new ScheduledJobDefinition();
+		jobDetail.setId(PurgeExpiredFilesJob.class.getName());
+		jobDetail.setJobClass(PurgeExpiredFilesJob.class);
+		mySchedulerService.scheduleClusteredJob(DateUtils.MILLIS_PER_HOUR, jobDetail);
 	}
+
+	@Transactional(Transactional.TxType.NEVER)
+	public synchronized void cancelAndPurgeJob(String jobId) {
+		BulkExportJobEntity job = myTxTemplate.execute(t -> { 
+			return myBulkExportJobDao
+				.findByJobId(jobId)
+				.orElseThrow(() -> new ResourceNotFoundException(jobId));
+		});
+		
+		if (job.getStatus() == BulkJobStatusEnum.COMPLETE){
+			myTxTemplate.execute(t -> {
+
+				for (BulkExportCollectionEntity nextCollection : job.getCollections()) {
+					for (BulkExportCollectionFileEntity nextFile : nextCollection.getFiles()) {
+						ourLog.info("Purging bulk data file: {}", nextFile.getResourceId());
+						getBinaryDao().delete(toId(nextFile.getResourceId()));
+						getBinaryDao().forceExpungeInExistingTransaction(toId(nextFile.getResourceId()), new ExpungeOptions().setExpungeDeletedResources(true).setExpungeOldVersions(true), null);
+						myBulkExportCollectionFileDao.deleteByPid(nextFile.getId());
+
+					}
+
+					myBulkExportCollectionDao.deleteByPid(nextCollection.getId());
+				}
+
+				ourLog.info("*** ABOUT TO DELETE");
+				myBulkExportJobDao.deleteByPid(job.getId());
+				return null;
+			});
+		}
+	}
+
 
 	@Transactional
 	@Override
@@ -339,18 +359,6 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	@Transactional
 	@Override
 	public JobInfo getJobInfoOrThrowResourceNotFound(String theJobId) {
-		// 	Optional<BulkExportJobEntity> jobToProcessOpt = myTxTemplate.execute(t -> {
-		// 	Pageable page = PageRequest.of(0, 1);
-		// 	Slice<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByStatus(page, BulkJobStatusEnum.SUBMITTED);
-        //     System.out.println("Chit prints from 97 "+ submittedJobs);
-		// 	System.out.println("getJobInfo thread: " + Thread.currentThread().getName());
-		// 	if (submittedJobs.isEmpty()) {
-		// 		return Optional.empty();
-		// 	}
-		// 	return Optional.of(submittedJobs.getContent().get(0));
-		// });
-
-		// System.out.println("jobToProcessOpt:" + jobToProcessOpt);
 		BulkExportJobEntity job = myBulkExportJobDao
 			.findByJobId(theJobId)
 			.orElseThrow(() -> new ResourceNotFoundException(theJobId));
@@ -403,23 +411,42 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		});
 	}
 
+
 	public static class Job implements HapiJob {
 		@Autowired
 		private IBulkDataExportSvc myTarget;
-
+		@Autowired
+		private TenantManagementService tenantManagementService;
+		@Autowired
+		private UrlPathTenantIdentifierResolver urlPathTenantIdentifierResolver;
+		
 		@Override
-		public void execute(JobExecutionContext theContext) {			
-			myTarget.buildExportFiles();
+		public void execute(JobExecutionContext theContext) {	
+			List<String> tenants =  tenantManagementService.findAll();	
+			for (String tenant : tenants) {
+				urlPathTenantIdentifierResolver.setTenantForScheduledTasks(tenant);
+				myTarget.buildExportFiles();
+
+			}	
 		}
 	}
 
 	public static class PurgeExpiredFilesJob implements HapiJob {
 		@Autowired
 		private IBulkDataExportSvc myTarget;
+		@Autowired
+		private TenantManagementService tenantManagementService;
+		@Autowired
+		private UrlPathTenantIdentifierResolver urlPathTenantIdentifierResolver;
 
 		@Override
 		public void execute(JobExecutionContext theContext) {
-			myTarget.purgeExpiredFiles();
+			List<String> tenants =  tenantManagementService.findAll();	
+			for (String tenant : tenants) {
+				urlPathTenantIdentifierResolver.setTenantForScheduledTasks(tenant);
+				myTarget.purgeExpiredFiles();
+
+			}
 		}
 	}
 

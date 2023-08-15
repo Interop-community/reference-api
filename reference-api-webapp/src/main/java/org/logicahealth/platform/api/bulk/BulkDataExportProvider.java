@@ -27,9 +27,14 @@ import java.util.Date;
 import java.util.Set;
 
 import org.logicahealth.platform.api.bulk.BulkExportJobRunnerService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.logicahealth.platform.api.bulk.BulkDataExportSvcImpl;
 public class BulkDataExportProvider extends ca.uhn.fhir.jpa.bulk.provider.BulkDataExportProvider{
     
+	private static final Logger ourLog = LoggerFactory.getLogger(BulkDataExportProvider.class);
+
+
     @Autowired
 	private IBulkDataExportSvc myBulkDataExportSvc;
 
@@ -55,22 +60,6 @@ public class BulkDataExportProvider extends ca.uhn.fhir.jpa.bulk.provider.BulkDa
 		if (prefer.getRespondAsync() == false) {
 			throw new InvalidRequestException("Must request async processing for $export");
 		}
-
-		String cacheControlHeader = theRequestDetails.getHeader(Constants.HEADER_CACHE_CONTROL);
-		if (cacheControlHeader != null && cacheControlHeader.equals(Constants.CACHE_CONTROL_NO_CACHE)) {
-			System.out.println(cacheControlHeader);
-
-			try{
-			final var cleanCache = new Thread(()-> myBulkDataExportSvc.cancelAndPurgeAllJobs());
-            cleanCache.start();
-            cleanCache.join();
-			}
-		 catch (InterruptedException e) {
-			System.out.println("Exception while cleaning cache:"+ e);
-
-			}  
-		}
-
 		String outputFormat = theOutputFormat != null ? theOutputFormat.getValueAsString() : null;
 
 		Set<String> resourceTypes = null;
@@ -88,8 +77,17 @@ public class BulkDataExportProvider extends ca.uhn.fhir.jpa.bulk.provider.BulkDa
 			filters = ArrayUtil.commaSeparatedListToCleanSet(theTypeFilter.getValueAsString());
 		}
 
+		String cacheControlHeader = theRequestDetails.getHeader(Constants.HEADER_CACHE_CONTROL);
+		Boolean useCache = (cacheControlHeader != null && cacheControlHeader.equals(Constants.CACHE_CONTROL_NO_CACHE)) ? false : true;
+
+		ourLog.info("useCache in BulkExport: " + useCache);
+
 		IBulkDataExportSvc.JobInfo outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
-		bulkJobRunnerSvc.runJob((BulkDataExportSvcImpl) myBulkDataExportSvc);
+
+		if (!useCache) {
+			((BulkDataExportSvcImpl) myBulkDataExportSvc).cancelAndPurgeJob(outcome.getJobId());
+			outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
+			}
 
 
 		String serverBase = getServerBase(theRequestDetails);
@@ -106,8 +104,6 @@ public class BulkDataExportProvider extends ca.uhn.fhir.jpa.bulk.provider.BulkDa
 	}
 
     private String getServerBase(ServletRequestDetails theRequestDetails) {
-        System.out.println(theRequestDetails.getServerBaseForRequest());
-        System.out.println(theRequestDetails.getHeaders());
 		return StringUtils.removeEnd(theRequestDetails.getServerBaseForRequest(), "/");
 	}
     
