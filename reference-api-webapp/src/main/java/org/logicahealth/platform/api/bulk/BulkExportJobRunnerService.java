@@ -13,26 +13,19 @@ public class BulkExportJobRunnerService {
     private static final Logger ourLog = LoggerFactory.getLogger(BulkExportJobRunnerService.class);
 
 
-    @Async
+    @Async("taskExecutor")
     public void runJob(BulkDataExportSvcImpl myBulkDataExportSvc) {
         ourLog.info("Starting BulkExportJobRunnerService.runJob");
-        try{
                         
-            ourLog.info("Purging expired files before building export files");
-            final var purger = new Thread(()-> myBulkDataExportSvc.purgeExpiredFiles());
-            purger.start();
-            purger.join();
-            ourLog.info("Purging expired files finished");
-			
-            ourLog.info("Building export files..");
-			final var jobRunner = new Thread(() -> myBulkDataExportSvc.buildExportFiles());
-			jobRunner.start();
-			jobRunner.join();
-            ourLog.info("Building export files finished");
-		} catch (InterruptedException e) {
-			ourLog.error("Exception while BulkExportJobRunnerService.runJob", e);
+        ourLog.info("Purging expired files before building export files");
+        myBulkDataExportSvc.purgeExpiredFiles();
+        ourLog.info("Purging expired files finished");
+        
+        ourLog.info("Building export files..");
+        myBulkDataExportSvc.buildExportFiles();
+        ourLog.info("Building export files finished");
 
-		}        ourLog.info("Finished BulkExportJobRunnerService.runJob");
+        ourLog.info("Finished BulkExportJobRunnerService.runJob");
 
     }
 

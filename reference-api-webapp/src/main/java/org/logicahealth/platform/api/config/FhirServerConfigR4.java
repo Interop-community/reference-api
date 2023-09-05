@@ -37,6 +37,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.annotation.Lazy;
 
+import ca.uhn.fhir.jpa.search.reindex.IResourceReindexingSvc;
+import ca.uhn.fhir.jpa.search.reindex.ResourceReindexingSvcImpl;
 
 @Configuration
 @Profile("r4")
@@ -75,6 +77,9 @@ public class FhirServerConfigR4 extends BaseJavaConfigR4 {
 		return new BulkDataExportProvider();
 	}
 
-
-
+    @Bean
+	@Lazy
+    public IResourceReindexingSvc resourceReindexingSvc() {
+		return new ResourceReindexingSvcImpl();
+	}
 }

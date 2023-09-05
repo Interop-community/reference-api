@@ -16,7 +16,7 @@ public class ReferenceApiConfig {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(5);
         executor.setMaxPoolSize(10);
-        executor.setQueueCapacity(25);
+        executor.setQueueCapacity(100);
         executor.initialize();
         return executor;
     }
