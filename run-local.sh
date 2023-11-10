@@ -61,4 +61,5 @@ java \
   -Xms256M \
   -Xmx1536m \
   -Dhspc.platform.api.sandbox.name=${sandbox_name} \
+  -Dhspc.platform.api.security.mode=open \
   -jar ${jar}
