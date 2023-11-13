@@ -92,9 +92,6 @@ public class FhirRestServlet extends RestfulServer {
     @Value("${hspc.platform.api.fhir.bulk.exportEnabled}")
     private boolean bulkExportEnabled;
 
-    @Autowired
-    BulkDataExportProvider bulkDataExportProvider;
-
     private String fhirOpenServletPathPart;
 
     DaoRegistry registry;
@@ -133,6 +130,8 @@ public class FhirRestServlet extends RestfulServer {
         } else if (fhirVersion == FhirVersionEnum.R4) {
             resourceProviders = myAppCtx.getBean("myResourceProvidersR4", ResourceProviderFactory.class);
             systemProvider = myAppCtx.getBean("mySystemProviderR4", JpaSystemProviderR4.class);
+            if(bulkExportEnabled)
+                registerProvider(new BulkDataExportProvider());
         } else if (fhirVersion == FhirVersionEnum.R5) {
             resourceProviders = myAppCtx.getBean("myResourceProvidersR5", ResourceProviderFactory.class);
             systemProvider = myAppCtx.getBean("mySystemProviderR5", JpaSystemProviderR5.class);
@@ -244,8 +243,6 @@ public class FhirRestServlet extends RestfulServer {
             registerProvider(myAppCtx.getBean(ca.uhn.fhir.jpa.provider.TerminologyUploaderProvider.class));
         }
 
-        if(bulkExportEnabled)
-            registerProvider(bulkDataExportProvider);
     }
 
     /**

@@ -71,11 +71,12 @@ public class FhirServerConfigR4 extends BaseJavaConfigR4 {
 		return new BulkDataExportSvcImpl();
 	}
 
-	@Bean
-	@Lazy
-	public BulkDataExportProvider bulkDataExportProvider() {
-		return new BulkDataExportProvider();
-	}
+    //create as an object in /src/main/java/org/logicahealth/platform/api/FhirRestServlet.java @134 to limit the support only for R4
+	// @Bean
+	// @Lazy
+	// public BulkDataExportProvider bulkDataExportProvider() {
+	// 	return new BulkDataExportProvider();
+	// }
 
     @Bean
 	@Lazy
