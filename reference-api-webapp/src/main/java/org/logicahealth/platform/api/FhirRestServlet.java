@@ -131,7 +131,7 @@ public class FhirRestServlet extends RestfulServer {
             resourceProviders = myAppCtx.getBean("myResourceProvidersR4", ResourceProviderFactory.class);
             systemProvider = myAppCtx.getBean("mySystemProviderR4", JpaSystemProviderR4.class);
             if(bulkExportEnabled)
-                registerProvider(new BulkDataExportProvider());
+                registerProvider(myAppCtx.getBean("bulkDataExportProvider", BulkDataExportProvider.class));
         } else if (fhirVersion == FhirVersionEnum.R5) {
             resourceProviders = myAppCtx.getBean("myResourceProvidersR5", ResourceProviderFactory.class);
             systemProvider = myAppCtx.getBean("mySystemProviderR5", JpaSystemProviderR5.class);

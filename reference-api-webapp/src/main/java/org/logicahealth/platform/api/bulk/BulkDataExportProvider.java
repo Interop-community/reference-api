@@ -1,8 +1,9 @@
 package org.logicahealth.platform.api.bulk;
 
-import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.jpa.bulk.api.IBulkDataExportSvc;
-import ca.uhn.fhir.jpa.bulk.model.BulkExportResponseJson;
+import ca.uhn.fhir.jpa.bulk.model.BulkJobStatusEnum;
+import ca.uhn.fhir.jpa.dao.data.IBulkExportJobDao;
+import ca.uhn.fhir.jpa.entity.BulkExportJobEntity;
 import ca.uhn.fhir.jpa.model.util.JpaConstants;
 import ca.uhn.fhir.rest.annotation.Operation;
 import ca.uhn.fhir.rest.annotation.OperationParam;
@@ -12,45 +13,48 @@ import ca.uhn.fhir.rest.server.RestfulServerUtils;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import ca.uhn.fhir.util.ArrayUtil;
-import ca.uhn.fhir.util.JsonUtil;
-import ca.uhn.fhir.util.OperationOutcomeUtil;
-import com.google.common.annotations.VisibleForTesting;
+
 import org.apache.commons.lang3.StringUtils;
-import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
 import org.hl7.fhir.instance.model.api.IPrimitiveType;
-import org.hl7.fhir.r4.model.InstantType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import java.util.Date;
+import java.util.Optional;
 import java.util.Set;
 
-import org.logicahealth.platform.api.bulk.BulkExportJobRunnerService;
+import org.logicahealth.platform.api.multitenant.tenantid.UrlPathTenantIdentifierResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.logicahealth.platform.api.bulk.BulkDataExportSvcImpl;
-public class BulkDataExportProvider extends ca.uhn.fhir.jpa.bulk.provider.BulkDataExportProvider{
-    
+
+public class BulkDataExportProvider extends ca.uhn.fhir.jpa.bulk.provider.BulkDataExportProvider {
+
 	private static final Logger ourLog = LoggerFactory.getLogger(BulkDataExportProvider.class);
 
+	@Autowired
+	private IBulkExportJobDao myBulkExportJobDao;
 
-    @Autowired
+	@Autowired
 	private IBulkDataExportSvc myBulkDataExportSvc;
 
+	@Autowired
+	private BulkExportJobRunnerService bulkJobRunnerSvc;
+
+	@Autowired
+	private UrlPathTenantIdentifierResolver urlPathTenantIdentifierResolver;
+
 	@Value("${hspc.platform.api.fhir.bulk.schedulerEnabled}")
-    private boolean schedulerEnabled;
+	private boolean schedulerEnabled;
 
 	@Override
 	@Operation(name = JpaConstants.OPERATION_EXPORT, global = false /* set to true once we can handle this */, manualResponse = true, idempotent = true)
 	public void export(
-		@OperationParam(name = JpaConstants.PARAM_EXPORT_OUTPUT_FORMAT, min = 0, max = 1, typeName = "string") IPrimitiveType<String> theOutputFormat,
-		@OperationParam(name = JpaConstants.PARAM_EXPORT_TYPE, min = 0, max = 1, typeName = "string") IPrimitiveType<String> theType,
-		@OperationParam(name = JpaConstants.PARAM_EXPORT_SINCE, min = 0, max = 1, typeName = "instant") IPrimitiveType<Date> theSince,
-		@OperationParam(name = JpaConstants.PARAM_EXPORT_TYPE_FILTER, min = 0, max = 1, typeName = "string") IPrimitiveType<String> theTypeFilter,
-		ServletRequestDetails theRequestDetails
-	) {
+			@OperationParam(name = JpaConstants.PARAM_EXPORT_OUTPUT_FORMAT, min = 0, max = 1, typeName = "string") IPrimitiveType<String> theOutputFormat,
+			@OperationParam(name = JpaConstants.PARAM_EXPORT_TYPE, min = 0, max = 1, typeName = "string") IPrimitiveType<String> theType,
+			@OperationParam(name = JpaConstants.PARAM_EXPORT_SINCE, min = 0, max = 1, typeName = "instant") IPrimitiveType<Date> theSince,
+			@OperationParam(name = JpaConstants.PARAM_EXPORT_TYPE_FILTER, min = 0, max = 1, typeName = "string") IPrimitiveType<String> theTypeFilter,
+			ServletRequestDetails theRequestDetails) {
 
 		String preferHeader = theRequestDetails.getHeader(Constants.HEADER_PREFER);
 		PreferHeader prefer = RestfulServerUtils.parsePreferHeader(null, preferHeader);
@@ -75,30 +79,39 @@ public class BulkDataExportProvider extends ca.uhn.fhir.jpa.bulk.provider.BulkDa
 		}
 
 		String cacheControlHeader = theRequestDetails.getHeader(Constants.HEADER_CACHE_CONTROL);
-        String bypassScheduler = theRequestDetails.getHeader("Bypass-Scheduler");
+		String bypassScheduler = theRequestDetails.getHeader("Bypass-Scheduler");
 		bypassScheduler = bypassScheduler != null ? bypassScheduler : "false";
-        Boolean useCache = (cacheControlHeader != null && cacheControlHeader.equals(Constants.CACHE_CONTROL_NO_CACHE)) ? false : true;
+		Boolean useCache = (cacheControlHeader != null && cacheControlHeader.equals(Constants.CACHE_CONTROL_NO_CACHE))
+				? false
+				: true;
 
+		IBulkDataExportSvc.JobInfo outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
+		if ((schedulerEnabled && bypassScheduler.equalsIgnoreCase("true")) || !schedulerEnabled) {
+			String tenant = urlPathTenantIdentifierResolver.resolveCurrentTenantIdentifier();
+			bulkJobRunnerSvc.runJob(tenant);
+			ourLog.info("JobId {} for tenant {} is at {} in bulkJobRunnerSvc queue.", outcome.getJobId(), tenant,
+					bulkJobRunnerSvc.getQueueSize());
+		}
 
-        IBulkDataExportSvc.JobInfo outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
-        if((schedulerEnabled && bypassScheduler.equalsIgnoreCase("true")) || !schedulerEnabled){        
-            ((BulkDataExportSvcImpl) myBulkDataExportSvc).startWithoutScheduler();
-        }
-
-
-        ourLog.info("useCache in BulkExport: " + useCache);
-        if (!useCache) {
-            ((BulkDataExportSvcImpl) myBulkDataExportSvc).cancelAndPurgeJob(outcome.getJobId());
-            outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
-            if((schedulerEnabled && bypassScheduler.equalsIgnoreCase("true")) || !schedulerEnabled){        
-                ourLog.info("Bypassing scheduler inside !useCache");
-                ((BulkDataExportSvcImpl) myBulkDataExportSvc).startWithoutScheduler();
-            }
-            }
-
+		ourLog.info("useCache in BulkExport: " + useCache);
+		if (!useCache) {
+			Optional<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByJobId(outcome.getJobId());
+			if (submittedJobs.isPresent() && submittedJobs.get().getStatus() == BulkJobStatusEnum.COMPLETE) {
+				((BulkDataExportSvcImpl) myBulkDataExportSvc).cancelAndPurgeJob(outcome.getJobId());
+				outcome = myBulkDataExportSvc.submitJob(outputFormat, resourceTypes, since, filters);
+				if ((schedulerEnabled && bypassScheduler.equalsIgnoreCase("true")) || !schedulerEnabled) {
+					ourLog.info("startWithoutScheduler for !useCache");
+					String tenant = urlPathTenantIdentifierResolver.resolveCurrentTenantIdentifier();
+					bulkJobRunnerSvc.runJob(tenant);
+					ourLog.info("JobId {} for tenant {} is at {} in bulkJobRunnerSvc queue.", outcome.getJobId(),
+							tenant, bulkJobRunnerSvc.getQueueSize());
+				}
+			}
+		}
 
 		String serverBase = getServerBase(theRequestDetails);
-		String pollLocation = serverBase + "/" + JpaConstants.OPERATION_EXPORT_POLL_STATUS + "?" + JpaConstants.PARAM_EXPORT_POLL_STATUS_JOB_ID + "=" + outcome.getJobId();
+		String pollLocation = serverBase + "/" + JpaConstants.OPERATION_EXPORT_POLL_STATUS + "?"
+				+ JpaConstants.PARAM_EXPORT_POLL_STATUS_JOB_ID + "=" + outcome.getJobId();
 
 		HttpServletResponse response = theRequestDetails.getServletResponse();
 
@@ -110,8 +123,8 @@ public class BulkDataExportProvider extends ca.uhn.fhir.jpa.bulk.provider.BulkDa
 		response.setStatus(Constants.STATUS_HTTP_202_ACCEPTED);
 	}
 
-    private String getServerBase(ServletRequestDetails theRequestDetails) {
+	private String getServerBase(ServletRequestDetails theRequestDetails) {
 		return StringUtils.removeEnd(theRequestDetails.getServerBaseForRequest(), "/");
 	}
-    
+
 }

@@ -1,6 +1,5 @@
 package org.logicahealth.platform.api.bulk;
 
-
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
@@ -51,13 +50,11 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.List;
 
-
 import static ca.uhn.fhir.util.UrlUtil.escapeUrlParam;
 import static ca.uhn.fhir.util.UrlUtil.escapeUrlParams;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
-
-import org.logicahealth.platform.api.multitenant.TenantManagementService;  //for multitenant awareness in scheduler's job
+import org.logicahealth.platform.api.multitenant.TenantManagementService; //for multitenant awareness in scheduler's job
 import org.logicahealth.platform.api.multitenant.tenantid.UrlPathTenantIdentifierResolver; //for multitenant awareness in scheduler's job
 
 public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
@@ -91,28 +88,24 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 
 	private int myRetentionPeriod = (int) (2 * DateUtils.MILLIS_PER_HOUR);
 
-
-    @Value("${hspc.platform.api.fhir.bulk.schedulerEnabled}")
-    private boolean schedulerEnabled;
-
-	@Autowired
-	private BulkExportJobRunnerService bulkJobRunnerSvc;
+	@Value("${hspc.platform.api.fhir.bulk.schedulerEnabled}")
+	private boolean schedulerEnabled;
 
 	@Autowired
 	private TenantManagementService tenantManagementService;
-
 
 	/**
 	 * This method is called by the scheduler to run a pass of the
 	 * generator
 	 */
-	@Transactional (value = Transactional.TxType.NEVER)
+	@Transactional(value = Transactional.TxType.NEVER)
 	@Override
 	public synchronized void buildExportFiles() {
 
 		Optional<BulkExportJobEntity> jobToProcessOpt = myTxTemplate.execute(t -> {
 			Pageable page = PageRequest.of(0, 1);
-			Slice<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByStatus(page, BulkJobStatusEnum.SUBMITTED);
+			Slice<BulkExportJobEntity> submittedJobs = myBulkExportJobDao.findByStatus(page,
+					BulkJobStatusEnum.SUBMITTED);
 			if (submittedJobs.isEmpty()) {
 				return Optional.empty();
 			}
@@ -125,7 +118,7 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		String jobUuid = jobToProcessOpt.get().getJobId();
 
 		try {
-					processJob(jobUuid);
+			processJob(jobUuid);
 		} catch (Exception e) {
 			ourLog.error("Failure while preparing bulk export extract", e);
 			myTxTemplate.execute(t -> {
@@ -141,7 +134,6 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		}
 
 	}
-
 
 	/**
 	 * This method is called by the scheduler to run a pass of the
@@ -170,7 +162,9 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 					for (BulkExportCollectionFileEntity nextFile : nextCollection.getFiles()) {
 						ourLog.info("Purging bulk data file: {}", nextFile.getResourceId());
 						getBinaryDao().delete(toId(nextFile.getResourceId()));
-						getBinaryDao().forceExpungeInExistingTransaction(toId(nextFile.getResourceId()), new ExpungeOptions().setExpungeDeletedResources(true).setExpungeOldVersions(true), null);
+						getBinaryDao().forceExpungeInExistingTransaction(toId(nextFile.getResourceId()),
+								new ExpungeOptions().setExpungeDeletedResources(true).setExpungeOldVersions(true),
+								null);
 						myBulkExportCollectionFileDao.deleteByPid(nextFile.getId());
 
 					}
@@ -191,19 +185,19 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 
 	private void processJob(String theJobUuid) {
 		JobParameters parameters = new JobParametersBuilder()
-			.addString("jobUUID", theJobUuid)
-			.addLong("readChunkSize", READ_CHUNK_SIZE)
-			.toJobParameters();
+				.addString("jobUUID", theJobUuid)
+				.addLong("readChunkSize", READ_CHUNK_SIZE)
+				.toJobParameters();
 
 		ourLog.info("Submitting bulk export job {} to job scheduler", theJobUuid);
 		try {
 			myJobSubmitter.runJob(myBulkExportJob, parameters);
-			
+
 		} catch (JobParametersInvalidException theE) {
-			ourLog.error("Unable to start job with UUID: {}, the parameters are invalid. {}", theJobUuid, theE.getMessage());
+			ourLog.error("Unable to start job with UUID: {}, the parameters are invalid. {}", theJobUuid,
+					theE.getMessage());
 		}
 	}
-
 
 	@SuppressWarnings("unchecked")
 	private IFhirResourceDao<IBaseBinary> getBinaryDao() {
@@ -215,7 +209,7 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		myTxTemplate = new TransactionTemplate(myTxManager);
 
 		if (schedulerEnabled) {
-			List<String> tenants =  tenantManagementService.findAll();	
+			List<String> tenants = tenantManagementService.findAll();
 
 			ScheduledJobDefinition jobDetail = new ScheduledJobDefinition();
 			jobDetail.setId(Job.class.getName());
@@ -236,7 +230,7 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 					.findByJobId(jobId)
 					.orElseThrow(() -> new ResourceNotFoundException(jobId));
 		});
-		
+
 		myTxTemplate.execute(t -> {
 
 			for (BulkExportCollectionEntity nextCollection : job.getCollections()) {
@@ -260,7 +254,8 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 
 	@Transactional
 	@Override
-	public JobInfo submitJob(String theOutputFormat, Set<String> theResourceTypes, Date theSince, Set<String> theFilters) {
+	public JobInfo submitJob(String theOutputFormat, Set<String> theResourceTypes, Date theSince,
+			Set<String> theFilters) {
 		String outputFormat = Constants.CT_FHIR_NDJSON;
 		if (isNotBlank(theOutputFormat)) {
 			outputFormat = theOutputFormat;
@@ -271,23 +266,28 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 
 		StringBuilder requestBuilder = new StringBuilder();
 		requestBuilder.append("/").append(JpaConstants.OPERATION_EXPORT);
-		requestBuilder.append("?").append(JpaConstants.PARAM_EXPORT_OUTPUT_FORMAT).append("=").append(escapeUrlParam(outputFormat));
+		requestBuilder.append("?").append(JpaConstants.PARAM_EXPORT_OUTPUT_FORMAT).append("=")
+				.append(escapeUrlParam(outputFormat));
 		Set<String> resourceTypes = theResourceTypes;
 		if (resourceTypes != null) {
-			requestBuilder.append("&").append(JpaConstants.PARAM_EXPORT_TYPE).append("=").append(String.join(",", escapeUrlParams(resourceTypes)));
+			requestBuilder.append("&").append(JpaConstants.PARAM_EXPORT_TYPE).append("=")
+					.append(String.join(",", escapeUrlParams(resourceTypes)));
 		}
 		Date since = theSince;
 		if (since != null) {
-			requestBuilder.append("&").append(JpaConstants.PARAM_EXPORT_SINCE).append("=").append(new InstantType(since).setTimeZoneZulu(true).getValueAsString());
+			requestBuilder.append("&").append(JpaConstants.PARAM_EXPORT_SINCE).append("=")
+					.append(new InstantType(since).setTimeZoneZulu(true).getValueAsString());
 		}
 		if (theFilters != null && theFilters.size() > 0) {
-			requestBuilder.append("&").append(JpaConstants.PARAM_EXPORT_TYPE_FILTER).append("=").append(String.join(",", escapeUrlParams(theFilters)));
+			requestBuilder.append("&").append(JpaConstants.PARAM_EXPORT_TYPE_FILTER).append("=")
+					.append(String.join(",", escapeUrlParams(theFilters)));
 		}
 		String request = requestBuilder.toString();
 
 		Date cutoff = DateUtils.addMilliseconds(new Date(), -myReuseBulkExportForMillis);
 		Pageable page = PageRequest.of(0, 10);
-		Slice<BulkExportJobEntity> existing = myBulkExportJobDao.findExistingJob(page, request, cutoff, BulkJobStatusEnum.ERROR);
+		Slice<BulkExportJobEntity> existing = myBulkExportJobDao.findExistingJob(page, request, cutoff,
+				BulkJobStatusEnum.ERROR);
 		if (!existing.isEmpty()) {
 			return toSubmittedJobInfo(existing.iterator().next());
 		}
@@ -298,8 +298,10 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		}
 
 		if (resourceTypes == null || resourceTypes.isEmpty()) {
-			// This is probably not a useful default, but having the default be "download the whole
-			// server" seems like a risky default too. We'll deal with that by having the default involve
+			// This is probably not a useful default, but having the default be "download
+			// the whole
+			// server" seems like a risky default too. We'll deal with that by having the
+			// default involve
 			// only returning a small time span
 			resourceTypes = myContext.getResourceTypes();
 			if (since == null) {
@@ -307,8 +309,7 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 			}
 		}
 
-		resourceTypes =
-			resourceTypes
+		resourceTypes = resourceTypes
 				.stream()
 				.filter(t -> !"Binary".equals(t))
 				.collect(Collectors.toSet());
@@ -327,7 +328,6 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		updateExpiry(job);
 		myBulkExportJobDao.save(job);
 
-
 		for (String nextType : resourceTypes) {
 
 			BulkExportCollectionEntity collection = new BulkExportCollectionEntity();
@@ -342,15 +342,11 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		return toSubmittedJobInfo(job);
 	}
 
-	@Transactional
-	public void startWithoutScheduler(){
-			bulkJobRunnerSvc.runJob(this);
-	}
-
 	public void validateTypes(Set<String> theResourceTypes) {
 		for (String nextType : theResourceTypes) {
 			if (!myDaoRegistry.isResourceTypeSupported(nextType)) {
-				String msg = myContext.getLocalizer().getMessage(BulkDataExportSvcImpl.class, "unknownResourceType", nextType);
+				String msg = myContext.getLocalizer().getMessage(BulkDataExportSvcImpl.class, "unknownResourceType",
+						nextType);
 				throw new InvalidRequestException(msg);
 			}
 		}
@@ -361,14 +357,18 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 			Set<String> types = new HashSet<>();
 			for (String next : theTheFilters) {
 				if (!next.contains("?")) {
-					throw new InvalidRequestException("Invalid " + JpaConstants.PARAM_EXPORT_TYPE_FILTER + " value \"" + next + "\". Must be in the form [ResourceType]?[params]");
+					throw new InvalidRequestException("Invalid " + JpaConstants.PARAM_EXPORT_TYPE_FILTER + " value \""
+							+ next + "\". Must be in the form [ResourceType]?[params]");
 				}
 				String resourceType = next.substring(0, next.indexOf("?"));
 				if (!theResourceTypes.contains(resourceType)) {
-					throw new InvalidRequestException("Invalid " + JpaConstants.PARAM_EXPORT_TYPE_FILTER + " value \"" + next + "\". Resource type does not appear in " + JpaConstants.PARAM_EXPORT_TYPE + " list");
+					throw new InvalidRequestException("Invalid " + JpaConstants.PARAM_EXPORT_TYPE_FILTER + " value \""
+							+ next + "\". Resource type does not appear in " + JpaConstants.PARAM_EXPORT_TYPE
+							+ " list");
 				}
 				if (!types.add(resourceType)) {
-					throw new InvalidRequestException("Invalid " + JpaConstants.PARAM_EXPORT_TYPE_FILTER + " value \"" + next + "\". Multiple filters found for type " + resourceType);
+					throw new InvalidRequestException("Invalid " + JpaConstants.PARAM_EXPORT_TYPE_FILTER + " value \""
+							+ next + "\". Multiple filters found for type " + resourceType);
 				}
 			}
 		}
@@ -386,8 +386,8 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 	@Override
 	public JobInfo getJobInfoOrThrowResourceNotFound(String theJobId) {
 		BulkExportJobEntity job = myBulkExportJobDao
-			.findByJobId(theJobId)
-			.orElseThrow(() -> new ResourceNotFoundException(theJobId));
+				.findByJobId(theJobId)
+				.orElseThrow(() -> new ResourceNotFoundException(theJobId));
 
 		JobInfo retVal = new JobInfo();
 		retVal.setJobId(theJobId);
@@ -401,8 +401,8 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 			for (BulkExportCollectionEntity nextCollection : job.getCollections()) {
 				for (BulkExportCollectionFileEntity nextFile : nextCollection.getFiles()) {
 					retVal.addFile()
-						.setResourceType(nextCollection.getResourceType())
-						.setResourceId(toQualifiedBinaryId(nextFile.getResourceId()));
+							.setResourceType(nextCollection.getResourceType())
+							.setResourceId(toQualifiedBinaryId(nextFile.getResourceId()));
 				}
 			}
 		}
@@ -437,7 +437,6 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		});
 	}
 
-
 	public static class Job implements HapiJob {
 		@Autowired
 		private IBulkDataExportSvc myTarget;
@@ -445,19 +444,18 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 		private TenantManagementService tenantManagementService;
 		@Autowired
 		private UrlPathTenantIdentifierResolver urlPathTenantIdentifierResolver;
-		
+
 		@Override
-		public void execute(JobExecutionContext theContext) {	
-			List<String> tenants =  tenantManagementService.findAll();	
+		public void execute(JobExecutionContext theContext) {
+			List<String> tenants = tenantManagementService.findAll();
 			for (String tenant : tenants) {
 				urlPathTenantIdentifierResolver.setTenantForScheduledTasks(tenant);
-				try{
-				myTarget.buildExportFiles();
+				try {
+					myTarget.buildExportFiles();
+				} catch (Exception e) {
+					ourLog.error("Error building export files", e);
 				}
-				catch(Exception e){
-					ourLog.error("Error building export files",e);
-				}
-			}	
+			}
 		}
 	}
 
@@ -471,14 +469,13 @@ public class BulkDataExportSvcImpl implements IBulkDataExportSvc {
 
 		@Override
 		public void execute(JobExecutionContext theContext) {
-			List<String> tenants =  tenantManagementService.findAll();	
+			List<String> tenants = tenantManagementService.findAll();
 			for (String tenant : tenants) {
 				urlPathTenantIdentifierResolver.setTenantForScheduledTasks(tenant);
-				try{
-				myTarget.purgeExpiredFiles();
-				}
-				catch(Exception e){
-					ourLog.error("Error purging expited files",e);
+				try {
+					myTarget.purgeExpiredFiles();
+				} catch (Exception e) {
+					ourLog.error("Error purging expited files", e);
 				}
 
 			}
