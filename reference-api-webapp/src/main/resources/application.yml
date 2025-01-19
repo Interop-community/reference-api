@@ -95,6 +95,9 @@ hspc:
         description: Meld FHIR CDR # Shows up in /metadata response
         fhirSecureServletPath: /data
         fhirOpenServletPath: /open
+        bulk:
+          exportEnabled: ${BULK_EXPORT_ENABLED:true}
+          schedulerEnabled:  ${BULK_SCHEDULER_ENABLED:false}
     # these values are used for internal calls to the auth server
     authorization:
       protocol: http

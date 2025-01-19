@@ -21,15 +21,25 @@
 package org.logicahealth.platform.api.config;
 
 import ca.uhn.fhir.jpa.api.svc.ISearchCoordinatorSvc;
+import ca.uhn.fhir.jpa.bulk.api.IBulkDataExportSvc;
 import ca.uhn.fhir.jpa.config.BaseJavaConfigR4;
 import ca.uhn.fhir.jpa.search.DatabaseBackedPagingProvider;
+
+import org.logicahealth.platform.api.bulk.BulkDataExportProvider;
+import org.logicahealth.platform.api.bulk.BulkDataExportSvcImpl;
+
 import org.logicahealth.platform.api.search.LogicaSearchCoordinatorSvcImpl;
+import org.springframework.batch.core.configuration.annotation.BatchConfigurer;
 import org.springframework.beans.factory.annotation.Autowire;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
+import org.springframework.context.annotation.Lazy;
+import ca.uhn.fhir.jpa.batch.config.InMemoryJobRepositoryBatchConfig;
+import ca.uhn.fhir.jpa.search.reindex.IResourceReindexingSvc;
+import ca.uhn.fhir.jpa.search.reindex.ResourceReindexingSvcImpl;
 
 @Configuration
 @Profile("r4")
@@ -55,4 +65,28 @@ public class FhirServerConfigR4 extends BaseJavaConfigR4 {
         return pagingProvider;
     }
 
+
+    @Bean
+	@Lazy
+    public IBulkDataExportSvc bulkDataExportSvc() {
+		return new BulkDataExportSvcImpl();
+	}
+
+    @Bean
+	@Lazy
+	public BulkDataExportProvider bulkDataExportProvider() {
+		return new BulkDataExportProvider();
+	}
+
+    @Bean
+	@Lazy
+    public IResourceReindexingSvc resourceReindexingSvc() {
+		return new ResourceReindexingSvcImpl();
+	}
+
+    @Bean
+    @Override
+	public BatchConfigurer batchConfigurer() {
+		return new InMemoryJobRepositoryBatchConfig();
+	}
 }
